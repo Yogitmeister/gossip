@@ -10,10 +10,10 @@ Everything on this page was verified empirically against **Codex CLI 0.144.0** o
 | Discover live sessions | ✅ | ✅ |
 | Read a peer's transcript without interrupting it | ✅ | ✅ |
 | Query across all transcripts | ✅ | ✅ |
-| Receive a message (next turn) | ✅ **verified** | ✅ |
-| Receive a message (mid-turn) | ✅ **verified** | ✅ |
-| Receive a message while fully idle | ❌ not yet | ✅ |
-| Send a message | ✅ (shell, or the planned MCP server) | ✅ |
+| Receive a gossip (next turn) | ✅ **verified** | ✅ |
+| Receive a gossip (mid-turn) | ✅ **verified** | ✅ |
+| Receive a gossip while fully idle | ❌ not yet | ✅ |
+| Send a gossip | ✅ (shell, or the planned MCP server) | ✅ |
 
 ## Why the first attempts failed
 
@@ -55,7 +55,7 @@ only when the project `.codex/` layer is trusted.
     "UserPromptSubmit": [
       { "hooks": [ { "type": "command",
                      "command": "python C:/path/to/gossip/hooks/drain.py",
-                     "statusMessage": "gossip: checking for messages",
+                     "statusMessage": "gossip: checking for gossip",
                      "timeout": 20 } ] }
     ]
   }
@@ -86,12 +86,12 @@ The injection contract is Claude Code's, unchanged:
 
 ```json
 {"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
-                        "additionalContext": "<message text>"}}
+                        "additionalContext": "<gossip text>"}}
 ```
 
 A hook emitting that on `UserPromptSubmit`, with the model asked to quote back any injected token,
-produced the canary verbatim in the assistant's reply. **A Codex session can receive a gossip
-message.** Codex also supports `additionalContextLimit` per handler — above it, the full text is
+produced the canary verbatim in the assistant's reply. **A Codex session can receive a gossip.**
+Codex also supports `additionalContextLimit` per handler — above it, the full text is
 written to disk and only a preview reaches the model, which is a better-behaved version of the
 notification clipping gossip works around on Claude Code.
 

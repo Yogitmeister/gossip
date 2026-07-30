@@ -5,7 +5,7 @@
 `gossip` is a **machine-local** bus between AI sessions running as the **same OS user**. That
 framing decides most of what follows: any process able to write the bus already has your file
 permissions. The interesting attacks are therefore not "steal the key" but **prompt injection**
-and **impersonation** — persuading another agent to do something, or to believe a message came
+and **impersonation** — persuading another agent to do something, or to believe a gossip came
 from the human.
 
 Out of scope by design: multi-user isolation, network transport, defending against an attacker who
@@ -37,14 +37,14 @@ two consciously not adopted.
 
 ### Fixed
 
-1. **Prompt injection via message body** (High) — narrowed to the attackable part. The body is
+1. **Prompt injection via gossip body** (High) — narrowed to the attackable part. The body is
    untrusted text in another agent's context; what it must not do is impersonate the envelope. Now
    defanged, and framing leads.
 
    *The proposed fix was rejected:* whitelisting body content and rejecting lines that start with
    `/`. Bodies are prose, so a content whitelist either breaks the product or is bypassed by
    rephrasing — and a leading slash is inert here regardless, since every programmatic injection
-   path in Claude Code sets `skipSlashCommands`. The residual risk is real and accepted: a message
+   path in Claude Code sets `skipSlashCommands`. The residual risk is real and accepted: a gossip
    can *persuade*. It cannot *execute*, and the recipient remains permission-gated.
 
 2. **Sender spoofing via `from_id`** (Medium) — kept (a relay legitimately forwards for another)
@@ -75,7 +75,7 @@ Path containment was still added as defense in depth, because a symlink pre-plan
 ### Not adopted
 
 - **`drain.log` timing disclosure** (Low) — same-user only, and this log is the attribution
-  mechanism that makes a vanished message diagnosable in one lookup. The diagnostic value exceeds
+  mechanism that makes a vanished gossip diagnosable in one lookup. The diagnostic value exceeds
   the leak.
 - **TOCTOU in `await_claim()`** (Low) — a hostile local process re-queueing a claimed file is not
   meaningfully different from that process deleting it, and the `archived` flag is already
@@ -84,4 +84,4 @@ Path containment was still added as defense in depth, because a symlink pre-plan
 ## Reporting
 
 Open an issue. This is a hobby project under a noncommercial licence with no security SLA; please
-do not use it where a delivery failure or a persuasive peer message would be costly.
+do not use it where a delivery failure or a persuasive peer gossip would be costly.

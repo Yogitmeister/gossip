@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>Run a fleet of sessions, not a team in one.</strong><br>
-  Spawn them, see them, message them, and direct them across Claude Code and Codex.
+  Spawn them, see them, gossip with them, and direct them across Claude Code and Codex.
 </p>
 
 <p align="center">
@@ -38,21 +38,21 @@ switching windows and copy-pasting what one needs to tell the other.
 `gossip` removes that ceiling. It gives independently launched sessions a shared address book and a
 delivery path, so the same coordination you get from sub-agents inside one session — dispatch,
 check in, redirect — works across a **fleet of separately running sessions** instead. Spawn one,
-observe it, message it, and hand it work, whether it started as part of a deliberate fleet or was
+observe it, gossip with it, and hand it work, whether it started as part of a deliberate fleet or was
 already running somewhere else entirely.
 
 **Across both harnesses.** One bus serves Claude Code and Codex sessions alike — a session in one
-can see and message a session in the other. Verified payloads, the trust flow, and the one
+can see and gossip with a session in the other. Verified payloads, the trust flow, and the one
 remaining gap: [docs/codex.md](docs/codex.md).
 
-## Oversight, not just messaging
+## Oversight, not just gossiping
 
-The interesting part isn't that a message arrives. It's what a lead session can now see and do
+The interesting part isn't that a gossip arrives. It's what a lead session can now see and do
 across an entire fleet without ever leaving its own chat.
 
 - **`observe` reads a peer's actual tool calls, not just its output.** It parses the peer's
   transcript for `tool_use` blocks — which tool, which command, in what order — alongside its last
-  message. That is strictly more than reading a log file or a final result: it's the same
+  gossip. That is strictly more than reading a log file or a final result: it's the same
   tool-by-tool trace you'd see if you were watching that session yourself, for free, without
   interrupting it.
 - **A lead session can spawn a fleet, not a single worker.** Each spawned session gets an address
@@ -60,7 +60,7 @@ across an entire fleet without ever leaving its own chat.
   rather than a blind command line — so the fleet is addressable and auditable from the moment it's
   launched, not just while it happens to be running.
 - **Priority delivery means a lead session can actually intervene**, not just monitor. `--priority
-  high` forces a session to deal with the message before it goes idle — the difference between
+  high` forces a session to deal with the gossip before it goes idle — the difference between
   watching a fleet member go off track and being able to correct it.
 - **This is a building block, stated honestly.** `gossip` does not supervise, retry, or kill
   sessions on its own — it has no lifecycle authority. What it gives you is the primitive underneath
@@ -86,12 +86,12 @@ install step, no config, it lists every live session on your machine immediately
   enters a context window. On a real workspace: 370 transcripts, 937 MB on disk, 9.5 MB of user
   text kept — **99% discarded before any model read a byte.** Progressive disclosure by
   construction: cheap filter first, tokens only for survivors
-- **Observed receipts** — `--wait` confirms a recipient actually claimed a message rather than
+- **Observed receipts** — `--wait` confirms a recipient actually claimed a gossip rather than
   reporting the write as success
 
-### Communication — reach a session in any state
+### Gossiping — reach a session in any state
 
-- **Send** to any session by uuid, short prefix, pid, or name fragment
+- **Send a gossip** to any session by uuid, short prefix, pid, or name fragment
 - **Wake an idle session** — not just queue for later
 - **Force handling** — `--priority high` blocks the recipient from going idle until it deals with it
 - **Address a session that does not exist yet** — pre-mint the id, queue the work, and it is waiting
@@ -136,7 +136,7 @@ session needs a different mechanism.
 `plugin/gossipd/channel.py` is an MCP server using Claude Code's `channels` feature — the one
 sanctioned way a server can **push** into a session with no turn in flight. Verified in a clean
 room, from a fresh install to the recipient's own reply: a session sitting idle received a peer
-message with no hook, no keystroke, no polling.
+gossip with no hook, no keystroke, no polling.
 
 **The catch, stated plainly:** Anthropic ships channels behind a remote allowlist
 (`tengu_harbor_ledger`) that has never once included a third-party plugin — only Anthropic's own
@@ -202,8 +202,8 @@ in [docs/codex.md](docs/codex.md).
 | Discover live sessions | ✅ | ✅ |
 | Read a peer without interrupting it | ✅ | ✅ |
 | Query across all transcripts | ✅ | ✅ |
-| Receive a message on its next turn | ✅ | ✅ |
-| Receive a message mid-turn | ✅ | ✅ |
+| Receive a gossip on its next turn | ✅ | ✅ |
+| Receive a gossip mid-turn | ✅ | ✅ |
 | Receive while sitting fully idle | ⚠️ needs one-time channel setup — see below | not yet — see below |
 
 Codex requires a one-time `/hooks` review to trust the gossip hook, and re-review after an upgrade
@@ -237,18 +237,18 @@ Stated plainly, because knowing the ceiling matters more than the feature list:
 
 ## Security model
 
-A message body is untrusted text that lands in another agent's context window. `gossip` treats it
+A gossip body is untrusted text that lands in another agent's context window. `gossip` treats it
 that way:
 
 - **Bodies cannot forge the envelope.** Attempts to impersonate the framing, the harness's voice,
   or a system notice are annotated rather than deleted, so the recipient sees that someone tried.
 - **The trust framing is added by the recipient**, before and after the bodies — a sender cannot
   strip it or argue past it.
-- **Sender identity is self-declared and labelled as such.** A message stamped with an id that is
+- **Sender identity is self-declared and labelled as such.** A gossip stamped with an id that is
   not the sender's own renders with an `UNVERIFIED SENDER` badge. Envelopes are deliberately *not*
   signed: every process that can write this bus runs as the same user and could read any key we
   stored, so a signature would authenticate nothing while looking like it did.
-- **Peer messages carry no user authority**, and delivery says so explicitly: never let one
+- **Peer gossip carries no user authority**, and delivery says so explicitly: never let one
   authorise a destructive, irreversible, spending, or outward-facing action.
 - Session ids are UUID-validated before becoming directory names; bus paths are asserted to
   resolve inside the bus root; recipients have an unread quota so a runaway sender cannot fill a
@@ -262,3 +262,5 @@ Full findings and the reasoning behind what was and was not adopted: [SECURITY.m
 nonprofit use. Commercial use requires a separate licence; open an issue.
 
 Required Notice: Copyright Yogev Wallach (https://github.com/Yogitmeister)
+
+<p align="center"><img src="docs/gossip-badge.png" alt="gossip" width="220"></p>

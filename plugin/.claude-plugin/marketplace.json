@@ -1,6 +1,6 @@
 {
   "name": "yogitmeister",
-  "description": "Tools for operating many Claude Code sessions at once: cross-session messaging, peer discovery, and context continuity.",
+  "description": "Tools for operating many Claude Code sessions at once: cross-session gossiping, peer discovery, and context continuity.",
   "owner": {
     "name": "Yogev Wallach"
   },
@@ -8,7 +8,7 @@
     {
       "name": "gossipd",
       "source": "./gossipd",
-      "description": "Cross-session messaging, peer discovery and compaction-surviving self-continuation for Claude Code CLI sessions."
+      "description": "Cross-session gossiping, peer discovery and compaction-surviving self-continuation for Claude Code CLI sessions."
     }
   ]
 }
