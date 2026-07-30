@@ -1,0 +1,19 @@
+{
+  "name": "gossipd",
+  "description": "Cross-session messaging and awareness for independently-launched Claude Code sessions. Pushes correspondence from a peer session -- or from your own pre-compaction self -- into a running session, even one sitting idle at its prompt.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Yogev Wallach"
+  },
+  "mcpServers": {
+    "gossip": {
+      "command": "python",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/channel.py"]
+    }
+  },
+  "channels": [
+    {
+      "server": "gossip"
+    }
+  ]
+}

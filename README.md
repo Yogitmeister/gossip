@@ -35,7 +35,8 @@ launched sessions cannot see or reach each other at all. The usual workaround is
 middle, copy-pasting.
 
 `gossip` gives them a shared filesystem bus and rides the harness's own hook surface to deliver
-into a session that is **already running** — including one parked idle at its prompt.
+into a session that is **already running** — including, with one extra step, one parked idle at
+its prompt.
 
 **Codex too.** One bus, both harnesses: a Claude Code session and a Codex session can see each
 other and exchange messages. Details, verified payloads, and the remaining gaps:
@@ -95,6 +96,33 @@ which makes hooks fail silently:
 }
 ```
 
+Hooks alone cover discovery, query, and delivery on next-turn / mid-turn — but every hook is
+**reactive**: a session sitting idle at its prompt fires none of them. Waking a genuinely idle
+session needs a different mechanism.
+
+### Waking an idle session (`plugin/`)
+
+`plugin/gossipd/channel.py` is an MCP server using Claude Code's `channels` feature — the one
+sanctioned way a server can **push** into a session with no turn in flight. Verified end-to-end in
+a clean room: a recipient sitting idle received a peer message with no hook, no keystroke, no
+polling.
+
+**The catch, stated plainly:** Anthropic ships channels behind a remote allowlist
+(`tengu_harbor_ledger`) that has never once included a third-party plugin — only Anthropic's own
+(discord, telegram, imessage, fakechat). There is no application process. Two ways around it:
+
+- `claude --dangerously-load-development-channels <marketplace>:<plugin>` — works, but re-prompts
+  on **every launch** with no way to persist the acknowledgement. Fine for testing, not for a
+  shipped tool.
+- `allowedChannelPlugins` in Claude Code's local managed settings — documented, persistent, and
+  (on Windows) needs no admin rights: `HKCU\SOFTWARE\Policies\ClaudeCode`, value `Settings`,
+  containing `{"channelsEnabled": true, "allowedChannelPlugins": [{"marketplace": "yogitmeister",
+  "plugin": "gossipd"}]}`. This is the intended install path. **Not yet verified end-to-end** —
+  tracked as open work below.
+
+Install the plugin itself with `/plugin marketplace add <path-to-plugin/>` then
+`/plugin install gossipd@yogitmeister`, or point `--channels` at it directly once allowlisted.
+
 Every hook exits 0 on every error path. A broken `gossip` install can never wedge a session.
 
 ## Use
@@ -145,10 +173,12 @@ in [docs/codex.md](docs/codex.md).
 | Query across all transcripts | ✅ | ✅ |
 | Receive a message on its next turn | ✅ | ✅ |
 | Receive a message mid-turn | ✅ | ✅ |
-| Receive while sitting fully idle | ✅ | not yet — see below |
+| Receive while sitting fully idle | ⚠️ needs one-time channel setup — see below | not yet — see below |
 
 Codex requires a one-time `/hooks` review to trust the gossip hook, and re-review after an upgrade
-changes it. That is Codex working as designed, not a workaround.
+changes it. That is Codex working as designed, not a workaround. Claude Code idle delivery needs the
+channel plugin admitted past Anthropic's remote allowlist — proven to work, but the shippable
+install path is not yet verified end to end. See [Waking an idle session](#waking-an-idle-session).
 
 **Want the last gap closed?** Waking a fully idle Codex session, and a gossip MCP server so Codex
 can send as fluently as it receives, are both on the [roadmap](#roadmap). Star the repo if you want
