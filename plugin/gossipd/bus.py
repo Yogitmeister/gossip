@@ -63,6 +63,11 @@ class BusError(Exception):
 CLAUDE_HOME = Path(os.environ.get("CLAUDE_CONFIG_DIR") or (Path.home() / ".claude"))
 BUS_ROOT = CLAUDE_HOME / "session-bus"
 REGISTRY = CLAUDE_HOME / "sessions"
+# Codex has no native per-session registry file the way Claude Code writes REGISTRY/<pid>.json
+# itself. gossip owns this one: gossip/hooks/drain.py's SessionStart handler populates it, keyed
+# by the codex.exe ancestor pid found via agent_ancestor(), so a Codex session's own shell-invoked
+# `gossip send --to self` can resolve its identity the same way Claude Code's already does.
+CODEX_REGISTRY = BUS_ROOT / "_registry_codex"
 MAX_BODY = 16000
 MAX_PENDING = 200          # unread messages per recipient before send() refuses
 KINDS = ("note", "task", "question", "answer", "ack", "continuation")
@@ -213,6 +218,19 @@ def _process_tree() -> dict[int, tuple[int, str, str]]:
 def claude_ancestor(start_pid: int | None = None) -> tuple[int, str] | None:
     """Walk up the process tree to the Claude Code process we belong to -> (pid, command_line).
 
+    Kept as a 2-tuple-returning wrapper around agent_ancestor() for existing callers; use
+    agent_ancestor() directly when the harness (which stem matched) matters.
+    """
+    found = agent_ancestor(start_pid)
+    if not found:
+        return None
+    pid, cmdline, _stem = found
+    return pid, cmdline
+
+
+def agent_ancestor(start_pid: int | None = None) -> tuple[int, str, str] | None:
+    """Walk up the process tree to the nearest CLI-agent ancestor -> (pid, command_line, stem).
+
     Parent-pid identity is not good enough. A hook, an MCP server and a Bash-invoked helper sit
     at different depths under the session, and helpers launched from separate shells are
     SIBLINGS rather than parent and child -- so getppid() can point at a shell, a wrapper, or
@@ -222,6 +240,14 @@ def claude_ancestor(start_pid: int | None = None) -> tuple[int, str] | None:
     process name: Claude Code's reported process name is now a version string (e.g. "2.1.119"),
     so name-matching silently stops working on upgrade. This is the trap claude-session-driver
     fell into.
+
+    Codex has no `--session-id` on its command line (its own session id is generated internally,
+    never passed as a CLI arg), so it is matched on image name alone -- and matched BEFORE
+    checking `ppid`, so the walk stops at the nearest Codex ancestor rather than climbing past it
+    to a further Claude Code ancestor. That climb-past was a real bug: a Codex subprocess launched
+    by a Claude Code session (e.g. for testing) previously had its `self` resolve to the outer
+    Claude session, because "codex" matched neither the claude-stem check nor `--session-id` in
+    cmdline, so the old walk fell through and kept climbing.
     """
     tree = _process_tree()
     if not tree:
@@ -233,8 +259,12 @@ def claude_ancestor(start_pid: int | None = None) -> tuple[int, str] | None:
             return None
         ppid, name, cmdline = entry
         stem = os.path.splitext(os.path.basename((name or "").strip()))[0].lower()
-        if stem in ("claude", "claude-code") or "--session-id" in cmdline:
-            return pid, cmdline
+        if stem in ("claude", "claude-code"):
+            return pid, cmdline, "claude"
+        if stem == "codex":
+            return pid, cmdline, "codex"
+        if "--session-id" in cmdline:
+            return pid, cmdline, "claude"
         if ppid <= 0 or ppid == pid:
             return None
         pid = ppid
@@ -252,7 +282,29 @@ def _self_id() -> str | None:
     Claude Code exports CLAUDE_CODE_SESSION_ID / CLAUDE_PID into every tool call, which is
     what makes `--to self` work from a Bash call: os.getpid() there is the python child, not
     the claude process, so the registry cannot be keyed off our own pid.
+
+    The ancestor walk runs FIRST, not as a last resort, and that ordering is load-bearing: env
+    vars are inherited down an entire process tree, so a Codex session launched AS A SUBPROCESS
+    of a Claude Code session (verified 2026-07-30: exactly this nesting, done for testing) sees
+    its Claude Code ancestor's CLAUDE_CODE_SESSION_ID -- a real value, just the WRONG session's.
+    Checking which agent is nearest before trusting any inherited env var means a Codex session
+    resolves to itself even when nested under Claude Code, and costs nothing extra in the common
+    unnested case, since agent_ancestor() is one process-table scrape either way.
     """
+    found = agent_ancestor()
+    if found:
+        pid, cmdline, stem = found
+        if stem == "codex":
+            # Codex has no --session-id on its command line and writes no registry of its own;
+            # gossip's SessionStart hook is the only source for this, via CODEX_REGISTRY.
+            try:
+                row = json.loads((CODEX_REGISTRY / f"{pid}.json").read_text(encoding="utf-8"))
+                if row.get("sessionId"):
+                    return row["sessionId"]
+            except Exception:
+                pass
+            return None  # nearest agent is Codex; do NOT fall through to inherited Claude env vars
+
     for var in ("SESSION_BUS_SELF", "CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID"):
         val = os.environ.get(var)
         if val:
@@ -265,11 +317,8 @@ def _self_id() -> str | None:
         except Exception:
             continue
 
-    # Last resort, and the reason claude_ancestor exists: no env hint and no registry row keyed
-    # to a pid we know. Costs a subprocess, so it only runs once every cheaper route has failed.
-    found = claude_ancestor()
     if found:
-        pid, cmdline = found
+        pid, cmdline, _stem = found
         match = _SESSION_ID_RE.search(cmdline or "")
         if match:
             return match.group(1)

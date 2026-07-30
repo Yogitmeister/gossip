@@ -40,12 +40,44 @@ for _cand in (_Path(__file__).resolve().parents[1], _Path(__file__).resolve().pa
     if str(_cand) not in _sys.path:
         _sys.path.insert(0, str(_cand))
 try:
-    from gossip.bus import BUS_ROOT, drain, idle_transport, peek, render  # type: ignore
+    from gossip.bus import (  # type: ignore
+        BUS_ROOT, CODEX_REGISTRY, agent_ancestor, drain, idle_transport, peek, render,
+    )
 except ImportError:
     try:
-        from bus import BUS_ROOT, drain, idle_transport, peek, render  # type: ignore
+        from bus import (  # type: ignore
+            BUS_ROOT, CODEX_REGISTRY, agent_ancestor, drain, idle_transport, peek, render,
+        )
     except ImportError:
         _sys.exit(0)
+
+
+def _register_codex_self(sid: str, cwd: str) -> None:
+    """Give a Codex session's own shell-invoked `--to self` calls something to resolve.
+
+    Codex writes no native per-session registry file the way Claude Code does, and its
+    session id never appears on the process command line the way `--session-id` does for
+    Claude Code -- so `_self_id()` in bus.py has nothing to find on its own for a Codex
+    session. This hook DOES receive the real session_id in its stdin payload on SessionStart,
+    so it is the only place that can hand that id forward to a later, identity-blind shell call.
+
+    Runs unconditionally on SessionStart (before the peek/early-out below), because a fresh
+    session with an empty inbox is the common case, not the exception.
+    """
+    try:
+        found = agent_ancestor()
+        if not found:
+            return
+        pid, _cmdline, stem = found
+        if stem != "codex":
+            return
+        CODEX_REGISTRY.mkdir(parents=True, exist_ok=True)
+        (CODEX_REGISTRY / f"{pid}.json").write_text(
+            json.dumps({"sessionId": sid, "cwd": cwd, "updatedAtMs": int(time.time() * 1000)}),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
 
 
 def _audit(session_id: str, event: str, count: int, consumed: bool) -> None:
@@ -77,6 +109,9 @@ def main() -> int:
     if not sid:
         return 0
     event = payload.get("hook_event_name") or ""
+
+    if event == "SessionStart":
+        _register_codex_self(sid, payload.get("cwd") or "")
 
     # Cheapest possible early-out: is there anything at all to deliver?
     if not peek(sid):
