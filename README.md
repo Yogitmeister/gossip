@@ -5,7 +5,7 @@
 <h1 align="center">gossip</h1>
 
 <p align="center">
-  <strong>Cross-session observability and communication for Claude Code.</strong><br>
+  <strong>Cross-session observability and communication for Claude Code and Codex.</strong><br>
   Tired of copy-pasting between sessions? Let them see each other and talk.
 </p>
 
@@ -34,8 +34,12 @@ Claude Code's built-in messaging only reaches teammates a session spawned itself
 launched sessions cannot see or reach each other at all. The usual workaround is you, in the
 middle, copy-pasting.
 
-`gossip` gives them a shared filesystem bus and rides Claude Code's own hook surface to deliver
+`gossip` gives them a shared filesystem bus and rides the harness's own hook surface to deliver
 into a session that is **already running** — including one parked idle at its prompt.
+
+**Codex too.** One bus, both harnesses: a Claude Code session and a Codex session can see each
+other and exchange messages. Details, verified payloads, and the remaining gaps:
+[docs/codex.md](docs/codex.md).
 
 ## What it does
 
@@ -127,6 +131,37 @@ and "it will receive this" are different claims:
 | `on-activity` | mid-turn, on the recipient's next tool call |
 | `on-next-turn` | queued; lands when it next runs a turn |
 | `unverified` | seen in the process table but never self-registered, so delivery is probable, not confirmed |
+
+## Claude Code and Codex
+
+Both harnesses expose the same hook contract, so one bus serves both. Verified against Codex CLI
+0.144.0 — the payload fields, the trust flow, and the one gap that is still open are all written up
+in [docs/codex.md](docs/codex.md).
+
+| | Claude Code | Codex |
+|---|---|---|
+| Discover live sessions | ✅ | ✅ |
+| Read a peer without interrupting it | ✅ | ✅ |
+| Query across all transcripts | ✅ | ✅ |
+| Receive a message on its next turn | ✅ | ✅ |
+| Receive a message mid-turn | ✅ | hook fires; injection unconfirmed |
+| Receive while sitting fully idle | ✅ | not yet — see below |
+
+Codex requires a one-time `/hooks` review to trust the gossip hook, and re-review after an upgrade
+changes it. That is Codex working as designed, not a workaround.
+
+**Want the last gap closed?** Waking a fully idle Codex session, and a gossip MCP server so Codex
+can send as fluently as it receives, are both on the [roadmap](#roadmap). Star the repo if you want
+them prioritised — it is the signal I actually use.
+
+## Roadmap
+
+- **Idle-session delivery on Codex.** The one capability Claude Code has and Codex does not.
+- **A gossip MCP server.** Today a session sends by shelling out. As an MCP server, `gossip` would
+  expose send/peek/search as first-class tools to any MCP-speaking harness, which is the cleaner
+  path for Codex and removes the shell round-trip everywhere.
+- **Confirmed mid-turn injection on Codex.** The hook fires with a full payload; the injection half
+  needs the same end-to-end proof the next-turn path already has.
 
 ## What it cannot do
 
