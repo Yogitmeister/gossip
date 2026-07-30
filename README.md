@@ -5,8 +5,8 @@
 <h1 align="center">gossip</h1>
 
 <p align="center">
-  <strong>Cross-session observability and communication for Claude Code and Codex.</strong><br>
-  Tired of copy-pasting between sessions? Let them see each other and talk.
+  <strong>Run a fleet of sessions, not a team in one.</strong><br>
+  Spawn them, see them, message them, and direct them across Claude Code and Codex.
 </p>
 
 <p align="center">
@@ -29,25 +29,56 @@
                     delivered whether B and C are busy or idle
 ```
 
-Two `claude` sessions launched in two terminals are separate OS processes with no shared runtime.
-Claude Code's built-in messaging only reaches teammates a session spawned itself, so independently
-launched sessions cannot see or reach each other at all. The usual workaround is you, in the
-middle, copy-pasting.
+Claude Code and Codex already let you run a team of sub-agents inside one session — a lead agent
+dispatching workers that share its process, its context, its lifecycle. That pattern has a ceiling:
+everything lives inside one session. Two `claude` processes in two terminals are strangers. Neither
+can see the other, neither can reach the other, and the only integration layer between them is you,
+switching windows and copy-pasting what one needs to tell the other.
 
-`gossip` gives them a shared filesystem bus and rides the harness's own hook surface to deliver
-into a session that is **already running** — including, with one extra step, one parked idle at
-its prompt.
+`gossip` removes that ceiling. It gives independently launched sessions a shared address book and a
+delivery path, so the same coordination you get from sub-agents inside one session — dispatch,
+check in, redirect — works across a **fleet of separately running sessions** instead. Spawn one,
+observe it, message it, and hand it work, whether it started as part of a deliberate fleet or was
+already running somewhere else entirely.
 
-**Codex too.** One bus, both harnesses: a Claude Code session and a Codex session can see each
-other and exchange messages. Details, verified payloads, and the remaining gaps:
-[docs/codex.md](docs/codex.md).
+**Across both harnesses.** One bus serves Claude Code and Codex sessions alike — a session in one
+can see and message a session in the other. Verified payloads, the trust flow, and the one
+remaining gap: [docs/codex.md](docs/codex.md).
+
+## Oversight, not just messaging
+
+The interesting part isn't that a message arrives. It's what a lead session can now see and do
+across an entire fleet without ever leaving its own chat.
+
+- **`observe` reads a peer's actual tool calls, not just its output.** It parses the peer's
+  transcript for `tool_use` blocks — which tool, which command, in what order — alongside its last
+  message. That is strictly more than reading a log file or a final result: it's the same
+  tool-by-tool trace you'd see if you were watching that session yourself, for free, without
+  interrupting it.
+- **A lead session can spawn a fleet, not a single worker.** Each spawned session gets an address
+  before it exists, a receipt recording how to reach it again, and a task delivered as correspondence
+  rather than a blind command line — so the fleet is addressable and auditable from the moment it's
+  launched, not just while it happens to be running.
+- **Priority delivery means a lead session can actually intervene**, not just monitor. `--priority
+  high` forces a session to deal with the message before it goes idle — the difference between
+  watching a fleet member go off track and being able to correct it.
+- **This is a building block, stated honestly.** `gossip` does not supervise, retry, or kill
+  sessions on its own — it has no lifecycle authority. What it gives you is the primitive underneath
+  that: a lightweight session that checks on a fleet and pings its lead the moment something goes
+  quiet is a few lines of `observe` and `send` away, not a framework you have to adopt.
+
+**See it work in one command:** clone the repo and run `python -m gossip.bus sessions` — no
+install step, no config, it lists every live session on your machine immediately.
 
 ## What it does
 
 ### Observability — see and query, without touching
 
 - **`sessions`** — every live session with id, pid, name, status, working directory, and a
-  reachability class saying how it can actually be reached right now
+  reachability class saying how it can actually be reached right now. Built from three sources
+  unioned (registry, process table, spawn receipts), because a session launched with a custom id
+  does not reliably register itself — a single-source roster silently misses exactly the sessions
+  you spawned yourself
 - **`observe <id>`** — read what a peer is working on, straight from its transcript. This costs the
   peer **nothing** and never interrupts it. Asking it instead costs a whole turn priced at *its*
   context size — a session carrying a 7 MB transcript re-sends all of it to emit one line
@@ -103,9 +134,9 @@ session needs a different mechanism.
 ### Waking an idle session (`plugin/`)
 
 `plugin/gossipd/channel.py` is an MCP server using Claude Code's `channels` feature — the one
-sanctioned way a server can **push** into a session with no turn in flight. Verified end-to-end in
-a clean room: a recipient sitting idle received a peer message with no hook, no keystroke, no
-polling.
+sanctioned way a server can **push** into a session with no turn in flight. Verified in a clean
+room, from a fresh install to the recipient's own reply: a session sitting idle received a peer
+message with no hook, no keystroke, no polling.
 
 **The catch, stated plainly:** Anthropic ships channels behind a remote allowlist
 (`tengu_harbor_ledger`) that has never once included a third-party plugin — only Anthropic's own
@@ -117,8 +148,8 @@ polling.
 - `allowedChannelPlugins` in Claude Code's local managed settings — documented, persistent, and
   (on Windows) needs no admin rights: `HKCU\SOFTWARE\Policies\ClaudeCode`, value `Settings`,
   containing `{"channelsEnabled": true, "allowedChannelPlugins": [{"marketplace": "yogitmeister",
-  "plugin": "gossipd"}]}`. This is the intended install path. **Not yet verified end-to-end** —
-  tracked as open work below.
+  "plugin": "gossipd"}]}`. This is the intended install path. **Not yet verified on a fresh
+  install** — tracked as open work below.
 
 Install the plugin itself with `/plugin marketplace add <path-to-plugin/>` then
 `/plugin install gossipd@yogitmeister`, or point `--channels` at it directly once allowlisted.
