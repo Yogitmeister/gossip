@@ -95,6 +95,24 @@ message.** Codex also supports `additionalContextLimit` per handler — above it
 written to disk and only a preview reaches the model, which is a better-behaved version of the
 notification clipping gossip works around on Claude Code.
 
+## `--to self` from inside Codex
+
+A Codex session addressing itself (`gossip send --to self ...`, and anything spawn-related that
+resolves its own identity) needed two fixes, both found by testing against a real Codex process
+rather than assuming the mechanism that works for Claude Code just carries over:
+
+- Codex has no `--session-id` on its command line and writes no per-session registry file the way
+  Claude Code does, so identity resolution had nothing Codex-shaped to find at all. Fixed with a
+  gossip-owned registry, populated by the `SessionStart` hook (which does receive the real session
+  id) and read back by anything resolving `self`.
+- Env vars are inherited down an entire process tree. A Codex session launched as a subprocess of
+  a Claude Code session — a real scenario, not just a test setup, any time a Claude Code session
+  shells out to `codex exec` for delegated work — would otherwise see its Claude Code ancestor's
+  session id and resolve to the wrong session entirely. Fixed by determining which harness is
+  actually running *before* trusting any inherited environment variable.
+
+Both verified against a real workspace Codex session, not an isolated test harness.
+
 ## Transcripts
 
 ```
