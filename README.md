@@ -144,7 +144,7 @@ in [docs/codex.md](docs/codex.md).
 | Read a peer without interrupting it | ✅ | ✅ |
 | Query across all transcripts | ✅ | ✅ |
 | Receive a message on its next turn | ✅ | ✅ |
-| Receive a message mid-turn | ✅ | hook fires; injection unconfirmed |
+| Receive a message mid-turn | ✅ | ✅ |
 | Receive while sitting fully idle | ✅ | not yet — see below |
 
 Codex requires a one-time `/hooks` review to trust the gossip hook, and re-review after an upgrade
@@ -160,8 +160,6 @@ them prioritised — it is the signal I actually use.
 - **A gossip MCP server.** Today a session sends by shelling out. As an MCP server, `gossip` would
   expose send/peek/search as first-class tools to any MCP-speaking harness, which is the cleaner
   path for Codex and removes the shell round-trip everywhere.
-- **Confirmed mid-turn injection on Codex.** The hook fires with a full payload; the injection half
-  needs the same end-to-end proof the next-turn path already has.
 
 ## What it cannot do
 

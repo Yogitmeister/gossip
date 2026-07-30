@@ -11,7 +11,7 @@ Everything on this page was verified empirically against **Codex CLI 0.144.0** o
 | Read a peer's transcript without interrupting it | ✅ | ✅ |
 | Query across all transcripts | ✅ | ✅ |
 | Receive a message (next turn) | ✅ **verified** | ✅ |
-| Receive a message (mid-turn) | ✅ hook fires; injection not yet verified | ✅ |
+| Receive a message (mid-turn) | ✅ **verified** | ✅ |
 | Receive a message while fully idle | ❌ not yet | ✅ |
 | Send a message | ✅ (shell, or the planned MCP server) | ✅ |
 
