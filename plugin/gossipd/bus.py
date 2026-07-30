@@ -275,6 +275,13 @@ _SESSION_ID_RE = re.compile(
     r"--session-id[= ]+([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
     r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12})")
 
+# Codex rollout filenames are rollout-<timestamp>-<uuid>.jsonl -- the uuid is always the
+# trailing 8-4-4-4-12 hex group, anchored at the end so it can't accidentally match hex-looking
+# fragments of the timestamp earlier in the string.
+_TRAILING_UUID_RE = re.compile(
+    r"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$")
+
 
 def _self_id() -> str | None:
     """Own session id.
@@ -933,8 +940,25 @@ def observe(session_id: str, cwd: str | None = None, tail_lines: int = 60,
 
 # --------------------------------------------------- searching across transcripts
 
+CODEX_HOME = Path(os.environ.get("CODEX_HOME") or (Path.home() / ".codex"))
+
+
+def _codex_rollout_files() -> list[Path]:
+    """Every Codex rollout transcript on disk, newest first.
+
+    Codex shards by date (YYYY/MM/DD/rollout-<timestamp>-<uuid>.jsonl) rather than by project
+    directory the way Claude Code does, so there is no per-project scoping to derive here --
+    all Codex transcripts are returned, and the caller filters by content if it needs to.
+    """
+    root = CODEX_HOME / "sessions"
+    if not root.is_dir():
+        return []
+    return sorted(root.glob("*/*/*/rollout-*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+
+
 def search(pattern: str, roles: str = "user", limit: int = 40,
-           context_chars: int = 130, all_projects: bool = False) -> dict:
+           context_chars: int = 130, all_projects: bool = False,
+           harness: str = "both") -> dict:
     """Regex-search every session transcript on disk, filtering BEFORE anything is read
     into a context window.
 
@@ -944,30 +968,35 @@ def search(pattern: str, roles: str = "user", limit: int = 40,
     to `roles="user"` alone discards 99% of the bytes before the model sees any of it.
 
     roles: "user" | "assistant" | "both"
+    harness: "claude" | "codex" | "both" -- Claude Code transcripts are project-scoped the same
+        way as before; Codex transcripts have no project scoping (see _codex_rollout_files) and
+        are searched in full whenever harness includes "codex", regardless of all_projects.
     """
     import collections
 
     rx = re.compile(pattern, re.I)
     root = CLAUDE_HOME / "projects"
-    # Scope defaults to the CURRENT project, derived from cwd rather than hardcoded. Claude Code
-    # names each project directory by replacing every non-alphanumeric character in the cwd with
-    # a dash -- verified against real directories: "C:\\Users\\Yogi" -> "C--Users-Yogi",
-    # "D:\\!! CLAUDE" -> "D-----CLAUDE". A hardcoded project name here searched nothing at all
-    # for anyone whose workspace was not this one.
-    if all_projects:
-        globpat = "*/*.jsonl"
-    else:
-        proj = re.sub(r"[^A-Za-z0-9]", "-", str(Path(os.getcwd()).resolve()))
-        globpat = f"{proj}/*.jsonl"
-        if not (root / proj).is_dir():
-            globpat = "*/*.jsonl"   # unknown cwd -> search everything rather than nothing
-    files = sorted(root.glob(globpat), key=lambda p: p.stat().st_mtime, reverse=True)
-
     want = {"user", "assistant"} if roles == "both" else {roles}
     hits: list[dict] = []
     per_session = collections.Counter()
     scanned_bytes = 0
     kept_bytes = 0
+    files: list[Path] = []
+
+    if harness in ("claude", "both"):
+        # Scope defaults to the CURRENT project, derived from cwd rather than hardcoded. Claude
+        # Code names each project directory by replacing every non-alphanumeric character in the
+        # cwd with a dash -- verified against real directories: "C:\\Users\\Yogi" ->
+        # "C--Users-Yogi", "D:\\!! CLAUDE" -> "D-----CLAUDE". A hardcoded project name here
+        # searched nothing at all for anyone whose workspace was not this one.
+        if all_projects:
+            globpat = "*/*.jsonl"
+        else:
+            proj = re.sub(r"[^A-Za-z0-9]", "-", str(Path(os.getcwd()).resolve()))
+            globpat = f"{proj}/*.jsonl"
+            if not (root / proj).is_dir():
+                globpat = "*/*.jsonl"   # unknown cwd -> search everything rather than nothing
+        files = sorted(root.glob(globpat), key=lambda p: p.stat().st_mtime, reverse=True)
 
     for path in files:
         sid = path.stem
@@ -1005,12 +1034,55 @@ def search(pattern: str, roles: str = "user", limit: int = 40,
                     hits.append({
                         "session": sid[:8],
                         "role": msg.get("role"),
+                        "harness": "claude",
                         "excerpt": txt[start:start + context_chars].replace("\n", " ").strip(),
                     })
 
+    codex_files: list[Path] = []
+    if harness in ("codex", "both"):
+        codex_files = _codex_rollout_files()
+        for path in codex_files:
+            m_id = _TRAILING_UUID_RE.search(path.stem)
+            sid = m_id.group(1) if m_id else path.stem
+            scanned_bytes += path.stat().st_size
+            try:
+                fh = open(path, encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            with fh:
+                for line in fh:
+                    try:
+                        entry = json.loads(line)
+                    except Exception:
+                        continue
+                    if entry.get("type") != "event_msg":
+                        continue
+                    payload = entry.get("payload") or {}
+                    ptype = payload.get("type")
+                    role = ("user" if ptype == "user_message"
+                            else "assistant" if ptype == "agent_message" else None)
+                    if role is None or role not in want:
+                        continue
+                    txt = payload.get("message")
+                    if not isinstance(txt, str) or not txt.strip():
+                        continue
+                    kept_bytes += len(txt)
+                    m = rx.search(txt)
+                    if not m:
+                        continue
+                    per_session[sid[:8]] += 1
+                    if len(hits) < limit:
+                        start = max(0, m.start() - context_chars // 2)
+                        hits.append({
+                            "session": sid[:8],
+                            "role": role,
+                            "harness": "codex",
+                            "excerpt": txt[start:start + context_chars].replace("\n", " ").strip(),
+                        })
+
     return {
         "pattern": pattern,
-        "transcripts": len(files),
+        "transcripts": len(files) + len(codex_files),
         "scannedMB": round(scanned_bytes / 1048576, 1),
         "textMB": round(kept_bytes / 1048576, 2),
         "filteredOutPct": round(100 * (1 - kept_bytes / scanned_bytes), 1) if scanned_bytes else 0,
@@ -1189,6 +1261,7 @@ def main() -> int:
     p.add_argument("--roles", default="user", choices=("user", "assistant", "both"))
     p.add_argument("--limit", type=int, default=40)
     p.add_argument("--all-projects", action="store_true")
+    p.add_argument("--harness", default="both", choices=("claude", "codex", "both"))
     p.add_argument("--json", action="store_true")
 
     p = sub.add_parser("spawned", help="sessions this tool launched, with resume keys")
@@ -1276,17 +1349,17 @@ def main() -> int:
         return 0
 
     if a.cmd == "search":
-        res = search(a.pattern, a.roles, a.limit, all_projects=a.all_projects)
+        res = search(a.pattern, a.roles, a.limit, all_projects=a.all_projects, harness=a.harness)
         if a.json:
             print(json.dumps(res, indent=2))
         else:
             print(f"{res['transcripts']} transcripts, {res['scannedMB']} MB on disk")
-            print(f"{res['roles'] if 'roles' in res else a.roles} text kept: {res['textMB']} MB "
+            print(f"{a.roles} text kept: {res['textMB']} MB "
                   f"({res['filteredOutPct']}% discarded before any model read it)")
             print(f"{res['totalHits']} hits across {res['sessions']} sessions")
             print(f"top: {res['topSessions']}")
             for h in res["hits"]:
-                print(f"  [{h['session']}/{h['role'][:1]}] {h['excerpt']}")
+                print(f"  [{h.get('harness', '?')[:1]}:{h['session']}/{h['role'][:1]}] {h['excerpt']}")
         return 0
 
     if a.cmd == "spawned":
