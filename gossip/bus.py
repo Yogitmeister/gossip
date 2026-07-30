@@ -884,7 +884,18 @@ def search(pattern: str, roles: str = "user", limit: int = 40,
 
     rx = re.compile(pattern, re.I)
     root = CLAUDE_HOME / "projects"
-    globpat = "*/*.jsonl" if all_projects else "D-----CLAUDE/*.jsonl"
+    # Scope defaults to the CURRENT project, derived from cwd rather than hardcoded. Claude Code
+    # names each project directory by replacing every non-alphanumeric character in the cwd with
+    # a dash -- verified against real directories: "C:\\Users\\Yogi" -> "C--Users-Yogi",
+    # "D:\\!! CLAUDE" -> "D-----CLAUDE". A hardcoded project name here searched nothing at all
+    # for anyone whose workspace was not this one.
+    if all_projects:
+        globpat = "*/*.jsonl"
+    else:
+        proj = re.sub(r"[^A-Za-z0-9]", "-", str(Path(os.getcwd()).resolve()))
+        globpat = f"{proj}/*.jsonl"
+        if not (root / proj).is_dir():
+            globpat = "*/*.jsonl"   # unknown cwd -> search everything rather than nothing
     files = sorted(root.glob(globpat), key=lambda p: p.stat().st_mtime, reverse=True)
 
     want = {"user", "assistant"} if roles == "both" else {roles}

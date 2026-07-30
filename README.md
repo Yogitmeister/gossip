@@ -1,6 +1,5 @@
-<!-- Drop your banner image at docs/banner.png and it renders here. -->
 <p align="center">
-  <img src="docs/banner.png" alt="gossip" width="640">
+  <img src="docs/logo.png" alt="gossip" width="300">
 </p>
 
 <h1 align="center">gossip</h1>
@@ -40,13 +39,31 @@ into a session that is **already running** — including one parked idle at its 
 
 ## What it does
 
-- **See every live session** — id, pid, name, status, working directory, and how reachable each one actually is
-- **Send text to any of them** — by uuid, short prefix, pid, or name fragment
+### Observability — see and query, without touching
+
+- **`sessions`** — every live session with id, pid, name, status, working directory, and a
+  reachability class saying how it can actually be reached right now
+- **`observe <id>`** — read what a peer is working on, straight from its transcript. This costs the
+  peer **nothing** and never interrupts it. Asking it instead costs a whole turn priced at *its*
+  context size — a session carrying a 7 MB transcript re-sends all of it to emit one line
+- **`search "<regex>"`** — query every session transcript on disk, filtering **before** anything
+  enters a context window. On a real workspace: 370 transcripts, 937 MB on disk, 9.5 MB of user
+  text kept — **99% discarded before any model read a byte.** Progressive disclosure by
+  construction: cheap filter first, tokens only for survivors
+- **Observed receipts** — `--wait` confirms a recipient actually claimed a message rather than
+  reporting the write as success
+
+### Communication — reach a session in any state
+
+- **Send** to any session by uuid, short prefix, pid, or name fragment
 - **Wake an idle session** — not just queue for later
-- **Force handling** — `--priority high` blocks the recipient from going idle until it deals with the message
-- **Address a session that does not exist yet** — pre-mint the id, queue the work, and it is waiting at boot
-- **Observed delivery** — `--wait` confirms the recipient actually claimed the message rather than assuming it did
-- **Self-continuation** — a session writes a letter to its own post-compaction self, and shapes what the summary keeps
+- **Force handling** — `--priority high` blocks the recipient from going idle until it deals with it
+- **Address a session that does not exist yet** — pre-mint the id, queue the work, and it is waiting
+  at boot
+- **Self-continuation** — a session leaves a letter for its own post-compaction self, and separately
+  authors what the compaction summary keeps
+- **Revive a stopped session** — hand an exited session a headless turn, or a slash command, against
+  its stored transcript
 
 ## Install
 
