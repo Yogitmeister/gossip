@@ -391,9 +391,15 @@ def _reachability(session_id: str, status: str, source: str) -> dict:
         if status == "busy":
             return {"class": "on-activity", "via": "hook",
                     "note": "mid-turn, on the recipient's next tool call"}
-        return {"class": "on-next-turn", "via": "hook",
-                "note": "queued now; lands when the session next runs a turn. For an idle "
-                        "recipient, arm a Monitor on `gossip watch` or send --priority high"}
+        # NOT "on-next-turn" -- that name read as a promise and the promise is empty: this
+        # session runs NO hooks right now, and a session parked at its prompt normally never
+        # takes another turn on its own. --priority high does not rescue it either: high
+        # priority blocks the NEXT Stop hook, and an idle session has no next Stop.
+        return {"class": "idle-no-wake", "via": None,
+                "note": "NOT reachable right now: runs no hooks while idle, no wake armed. "
+                        "Lands only if it happens to act again on its own. --priority high "
+                        "does NOT force this case. Fix belongs to the RECIPIENT: it must arm "
+                        "a Monitor on `gossip watch --for self` before it goes idle"}
     return {"class": "unverified", "via": None,
             "note": "observed in the process table but never self-registered: hook delivery is "
                     "probable, not confirmed. Ask it to run `gossip sessions` once"}
@@ -631,25 +637,43 @@ def send(target: str, body: str, kind: str = "note", priority: str = "normal",
     tmp.write_text(json.dumps(msg, ensure_ascii=True, indent=2), encoding="utf-8")
     os.replace(tmp, final)  # atomic publish
 
-    # Report what priority actually buys, rather than a generic guess.
+    # Report what will ACTUALLY happen next. Writing to an inbox is not delivery, and the two
+    # were conflated here until 2026-07-31: a sender could not tell "the recipient reads this in
+    # seconds" from "nothing in this system will ever show this to anyone". `state` is the
+    # machine-readable verdict; `delivery` stays human prose. Only `idle-no-wake` is a failure,
+    # and it is the one that used to be invisible.
     same = dest["sessionId"] == sender_id
     status = dest.get("status") or "?"
     transport = idle_transport(dest["sessionId"])
-    if priority == "high":
-        eta = ("forced: the recipient cannot go idle until it handles this (Stop hook blocks)"
-               + (f"; also pushed on arrival via {transport['source']}" if transport else ""))
-    elif transport:
-        eta = f"on arrival, within ~1s, via {transport['source']} (recipient may be idle)"
+    running = status == "busy"
+    if transport:
+        state = "wake-signaled"
+        eta = (f"on arrival, within ~1s, via {transport['source']} "
+               f"(recipient is reachable even while idle)")
     elif same:
-        eta = "at the end of your current turn (Stop hook)"
-    elif status == "busy":
-        eta = "within seconds (recipient is busy; PostToolUse drain)"
+        state = "self-turn-end"
+        eta = "at the end of your current turn (your own Stop hook)"
+    elif running and priority == "high":
+        state = "forced-at-turn-end"
+        eta = "forced: the recipient cannot go idle until it handles this (Stop hook blocks)"
+    elif running:
+        state = "on-activity"
+        eta = "within seconds (recipient is mid-turn; PostToolUse drain)"
     else:
-        eta = (f"deferred (recipient status={status}, no idle transport armed; delivers on its "
-               f"next activity). Send --priority high to force it, or have the recipient arm a "
-               f"Monitor on `gossip watch`.")
+        state = "idle-no-wake"
+        eta = (f"NOT DELIVERED -- queued only. Recipient status={status}: it is running no "
+               f"hooks and has no wake armed, so nothing will show it this message unless it "
+               f"acts on its own. "
+               + ("--priority high does NOT help here: it blocks the recipient's NEXT Stop "
+                  "hook, and an idle session has no next Stop. "
+                  if priority == "high" else "")
+               + "Treat this as unread until proven otherwise: `observe` it to see if it ever "
+                 "moved, and if this is load-bearing (a stand-down, a correction, a blocking "
+                 "answer) it needs a human at that terminal. The durable fix is on the "
+                 "RECIPIENT: it must arm a Monitor on `gossip watch --for self` before idling.")
 
-    out = {"ok": True, "message": msg, "to": dest, "delivery": eta, "file": str(final)}
+    out = {"ok": True, "message": msg, "to": dest, "state": state, "delivery": eta,
+           "file": str(final)}
 
     if wait > 0:
         receipt = await_claim(dest["sessionId"], msg["id"], timeout=wait,
@@ -1295,7 +1319,8 @@ def main() -> int:
                 print(f"{r['short']}  pid={r['pid']:<7} {r['status']:<8} "
                       f"{cls + via:<22} {r['name'][:38]:<38}{mark}")
             print("\nreach: idle-wake = lands even if idle | on-activity = next tool call | "
-                  "on-next-turn = next turn | unverified = observed, not self-registered")
+                  "idle-no-wake = UNREACHABLE, nothing will deliver | unverified = "
+                  "observed, not self-registered")
         return 0
 
     if a.cmd == "send":

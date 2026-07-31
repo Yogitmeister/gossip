@@ -8,6 +8,34 @@ description: See and gossip with other independently-launched Claude Code sessio
 Two `claude` sessions in two terminals cannot see or reach each other. This closes that gap.
 Drop `python -m gossip.bus` in front of every command below (or alias it to `gossip`).
 
+## First: arm your wake, or you cannot be reached at all
+
+Delivery rides the recipient's own hooks, and **an idle session runs no hooks**. Until you arm a
+wake, gossip sent to you lands in your inbox and is read by nobody, indefinitely, while the
+sender is told it was sent. Fix it in one call, at session start, before anything else:
+
+```
+ToolSearch(query="select:Monitor", max_results=1)      # Monitor is a deferred tool
+
+Monitor(
+  command: "python -m gossip.bus watch --for self --mode headline",
+  description: "incoming gossip",
+  persistent: true,
+  timeout_ms: 3600000
+)
+```
+
+Then `gossip sessions` and confirm your own row reads `idle-wake`, not `idle-no-wake`.
+
+- **`persistent: true` is mandatory** — without it the watch dies at the default 5-minute
+  timeout and you go silently deaf while still believing you are reachable.
+- **The notification is a pointer, not the payload** (notifications clip near 512 characters).
+  Seeing it is not reading it; `gossip drain` is.
+- Re-arm after anything that could have killed it — a compact, a `TaskStop`, an interrupted turn.
+- **No sender-side flag fixes an unarmed idle peer.** `--priority high` blocks the recipient's
+  *next* Stop hook, and an already-idle session has no next Stop. Only the recipient can prevent
+  this, and only in advance.
+
 ## Find out who is alive
 
 ```bash
@@ -18,7 +46,7 @@ Every row carries a **reachability class** — read it before you rely on delive
 
 - `idle-wake` — lands even if the recipient is idle
 - `on-activity` — mid-turn, on its next tool call
-- `on-next-turn` — queued until it next runs a turn
+- `idle-no-wake` — **unreachable**: runs no hooks, armed no wake. Sending stores; it does not deliver
 - `unverified` — observed but never self-registered; delivery is probable, not confirmed
 
 ## Send a gossip
@@ -27,8 +55,23 @@ Every row carries a **reachability class** — read it before you rely on delive
 gossip send --to <uuid|prefix|pid|name> --body "..." [--kind note|task|question|answer|ack|continuation]
 ```
 
+Every send returns a `state`. It is the difference between "stored" and "delivered", and it is
+the only thing worth believing:
+
+| `state` | what it means |
+|---|---|
+| `on-activity` | recipient is mid-turn; lands within seconds |
+| `forced-at-turn-end` | recipient is running + high priority; it cannot idle past this |
+| `wake-signaled` | recipient armed a wake; pushed on arrival (~1s) even while idle |
+| `self-turn-end` | queued to yourself; returns at this turn's end |
+| **`idle-no-wake`** | **not delivered. Nothing is reading that inbox.** |
+
+On `idle-no-wake`, do not report the peer as informed, told, or stood down. Resending changes
+nothing — the copy lands in the same unread inbox. `observe` it, route the work to a reachable
+session, or get a human to that terminal.
+
 - `--priority high` — the recipient may not go idle until it handles this. Use for "stop, wrong
-  branch", not for FYIs.
+  branch", not for FYIs. **It does nothing for a recipient that is already idle.**
 - `--wait 10` — block for an **observed** receipt instead of assuming delivery. Reports
   `CONFIRMED claimed after Nms`, or `NOT claimed` with what it fell back to.
 - Addresses do not have to exist yet. Queue to a pre-minted uuid and it is waiting at boot.
@@ -51,18 +94,6 @@ gossip send --to self --kind continuation --body "mid-migration: schema done, ba
 
 With the `PreCompact` hook registered this happens automatically, and that hook also authors what
 the compaction summary keeps.
-
-## Wake an idle session
-
-Arm the `Monitor` tool on:
-
-```bash
-gossip watch --for self --mode headline
-```
-
-Each arrival becomes one pointer line and the session wakes on it. Pointer, not payload:
-notifications are hard-clipped near 512 characters, so bodies stay in the inbox — `drain` or let
-the hooks deliver them.
 
 ## Spawn an addressable session
 
