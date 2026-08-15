@@ -1,18 +1,38 @@
 ---
 name: gossip
-description: See and gossip with other independently-launched Claude Code sessions. Use when work spans two or more sessions, when you need to hand a task to a session you did not spawn, when you want to know what another session is doing, or when you want to leave yourself a note that survives compaction.
+description: Discover, inspect, search, and coordinate independently launched Claude Code and Codex sessions through a local, scriptable bus. Use for cross-harness messaging, passive peer observation, transcript search, durable pre-boot or self-continuation messages, external CLI access, and transport receipts. For messaging inside one live Claude Code agent team, prefer its native SendMessage route.
 ---
 
-# gossip — cross-session observability and gossiping
+# gossip: cross-harness session observability and coordination
 
-Two `claude` sessions in two terminals cannot see or reach each other. This closes that gap.
-Drop `python -m gossip.bus` in front of every command below (or alias it to `gossip`).
+`gossip` is a model-independent local control surface for Claude Code and Codex sessions. It can
+discover live peers, inspect their tool activity without interrupting them, search transcript
+history locally, and exchange durable messages from agents, humans, hooks, or scripts. Drop
+`python -m gossip.bus` in front of every command below, or alias it to `gossip`.
 
-## First: arm your wake, or you cannot be reached at all
+## Choose the narrowest correct route
 
-Delivery rides the recipient's own hooks, and **an idle session runs no hooks**. Until you arm a
-wake, gossip sent to you lands in your inbox and is read by nobody, indefinitely, while the
-sender is told it was sent. Fix it in one call, at session start, before anything else:
+| Need | Route |
+|---|---|
+| Text inside one live Claude Code agent team | Claude Code `SendMessage` |
+| Independently launched sessions, Claude Code to Codex, or external scripts | `gossip` |
+| Inspect a peer without spending its turn | `gossip observe` |
+| Search Claude Code and Codex transcript history | `gossip search` |
+| Queue before boot, survive restart/compaction, or require a claim receipt | `gossip send` |
+| Admit safe JIT context or preserve checked facts across compaction | Flashback |
+| Compact, adapt, or exit this PTY-supervised session or a descendant | Agency |
+| Cross-machine Claude Code traffic | Claude Code Remote Control or cloud messaging |
+
+Claude's native channel is the better transport inside an existing live agent team: delivery is
+automatic with no Gossip hook. It does not replace Gossip's cross-harness roster,
+transcript observability, historical query, pre-boot addresses, or external CLI protocol.
+
+## Arm a Gossip wake when needed
+
+Gossip delivery rides the recipient's own hooks, and **an idle session runs no hooks**. Until you
+arm a Gossip wake, Gossip traffic sent to that route lands in the inbox but is read by nobody while
+the session stays idle. This does not apply to Claude Code's native `SendMessage` route. For Gossip
+idle delivery, arm the watch once at session start:
 
 ```
 ToolSearch(query="select:Monitor", max_results=1)      # Monitor is a deferred tool
@@ -25,7 +45,7 @@ Monitor(
 )
 ```
 
-Then `gossip sessions` and confirm your own row reads `idle-wake`, not `idle-no-wake`.
+Then run `gossip sessions` and confirm your own row reads `idle-wake`, not `idle-no-wake`.
 
 - **`persistent: true` is mandatory** — without it the watch dies at the default 5-minute
   timeout and you go silently deaf while still believing you are reachable.
@@ -126,5 +146,18 @@ yourself, with no such framing at all.
 
 ## What this cannot do
 
-It cannot send an executable slash command, cannot make a session compact itself (it can shape
-what survives), cannot impersonate the operator, and cannot cross machines.
+Gossip core cannot send an executable slash command, impersonate the operator, grant user authority,
+or cross machines. It also does not choose models, supervise retries, manage branches, or track
+cost; pair it with an orchestrator for those jobs.
+
+tmux is complementary. Use tmux to keep terminals alive, reattach, capture pane output, or control
+pane layout. A successful `tmux send-keys` means raw input reached a tmux target; it does not mean an
+agent claimed a Gossip message. Keep that terminal-input boundary in Agency.
+
+The separate Apache-2.0 Agency product can act on a PTY-supervised session and descendants it
+spawned. It combines well with Flashback: admit phase- or hook-relevant context, check load-bearing
+facts, request a focused `/compact`, then let Flashback re-verify what should survive. Agency can
+also expose `/model`, `/effort`,
+`/fast`, `/plan`, `/rename`, `/status`, `/usage`, `/reload-skills`, `/exit`, and the full local
+slash-command surface under a launch-time policy. That authority follows custody, never an ordinary
+Gossip message.

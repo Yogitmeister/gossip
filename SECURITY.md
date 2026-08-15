@@ -83,5 +83,5 @@ Path containment was still added as defense in depth, because a symlink pre-plan
 
 ## Reporting
 
-Open an issue. This is a hobby project under a noncommercial licence with no security SLA; please
-do not use it where a delivery failure or a persuasive peer gossip would be costly.
+Open an issue. This Apache-2.0 project has no security SLA; do not use it where a delivery failure
+or a persuasive peer gossip would be costly.

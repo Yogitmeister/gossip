@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gossip - conference handout</title>
+  <style>
+    :root {
+      --ink: #111317;
+      --paper: #f3f0e6;
+      --muted: #c9c6bb;
+      --line: #34383e;
+      --acid: #d9f400;
+      --soft-acid: #e8f77c;
+      --radius: 4mm;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      color: var(--paper);
+      background: #292c31;
+      font-family: Arial, Helvetica, sans-serif;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+
+    body {
+      display: grid;
+      justify-content: center;
+      gap: 14mm;
+      padding: 14mm 0;
+    }
+
+    .page {
+      position: relative;
+      width: 210mm;
+      height: 297mm;
+      overflow: hidden;
+      background: var(--ink);
+      box-shadow: 0 8mm 20mm rgb(0 0 0 / 0.28);
+      page-break-after: always;
+    }
+
+    .page:last-child { page-break-after: auto; }
+
+    .page-inner {
+      position: relative;
+      z-index: 2;
+      height: 100%;
+      padding: 15mm;
+    }
+
+    .topline {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 12mm;
+      border-bottom: 0.6mm solid var(--acid);
+      font: 700 9pt/1 Consolas, "Courier New", monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 3mm;
+      font-size: 13pt;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-mark {
+      width: 5mm;
+      height: 5mm;
+      border: 1.2mm solid var(--acid);
+      border-radius: 50%;
+      box-shadow: 4mm 0 0 -1.2mm var(--ink), 4mm 0 0 0 var(--acid);
+    }
+
+    .license { color: var(--acid); }
+
+    h1, h2, h3, p { margin: 0; }
+
+    h1, h2 {
+      font-family: "Arial Black", Impact, sans-serif;
+      text-transform: uppercase;
+      letter-spacing: -0.055em;
+    }
+
+    h1 {
+      max-width: 150mm;
+      font-size: 40pt;
+      line-height: 0.91;
+    }
+
+    h2 {
+      max-width: 175mm;
+      font-size: 31pt;
+      line-height: 0.95;
+    }
+
+    h3 {
+      font: 800 13pt/1.05 Arial, Helvetica, sans-serif;
+      text-transform: uppercase;
+      letter-spacing: -0.025em;
+    }
+
+    .acid { color: var(--acid); }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      min-height: 130mm;
+      padding-top: 14mm;
+    }
+
+    .hero-copy { position: relative; z-index: 2; }
+
+    .hero-copy > p {
+      max-width: 111mm;
+      margin-top: 9mm;
+      color: #e4e1d7;
+      font-size: 15pt;
+      line-height: 1.28;
+    }
+
+    .hero-art {
+      position: absolute;
+      z-index: 1;
+      top: 26mm;
+      right: -12mm;
+      width: 103mm;
+      height: 130mm;
+      object-fit: contain;
+      object-position: center top;
+      opacity: 0.97;
+      filter: saturate(0.9) contrast(1.05);
+      clip-path: inset(0 0 23% 0);
+    }
+
+    .proofline {
+      display: grid;
+      grid-template-columns: 0.78fr 1.22fr;
+      gap: 7mm;
+      align-items: stretch;
+      margin-top: 4mm;
+    }
+
+    .claim {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 6mm;
+      color: var(--ink);
+      background: var(--acid);
+      border-radius: var(--radius);
+    }
+
+    .claim strong {
+      font: 900 21pt/0.95 "Arial Black", Impact, sans-serif;
+      letter-spacing: -0.05em;
+      text-transform: uppercase;
+    }
+
+    .claim span {
+      margin-top: 6mm;
+      font: 700 9pt/1.2 Consolas, "Courier New", monospace;
+    }
+
+    .terminal {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 43mm;
+      padding: 6mm;
+      border: 0.5mm solid #555a62;
+      border-radius: var(--radius);
+      background: #171a1f;
+      box-shadow: inset 0 0 0 1mm #0d0f12;
+      font: 700 10.5pt/1.65 Consolas, "Courier New", monospace;
+    }
+
+    .terminal .prompt { color: var(--acid); }
+    .terminal .result { color: #aeb3b9; }
+
+    .capabilities {
+      display: grid;
+      grid-template-columns: 1.25fr 0.85fr 1fr 0.9fr;
+      gap: 5mm;
+      margin-top: 8mm;
+    }
+
+    .capability {
+      min-height: 45mm;
+      padding: 5mm 4mm;
+      border-top: 1mm solid var(--acid);
+      background: #1b1e23;
+    }
+
+    .capability:nth-child(2),
+    .capability:nth-child(4) { margin-top: 8mm; }
+
+    .capability p {
+      margin-top: 4mm;
+      color: var(--muted);
+      font-size: 9.5pt;
+      line-height: 1.32;
+    }
+
+    .page-one .footnote {
+      position: absolute;
+      right: 15mm;
+      bottom: 8mm;
+      color: #8f949b;
+      font: 7.3pt/1.2 Consolas, "Courier New", monospace;
+    }
+
+    .page-two .intro {
+      display: grid;
+      grid-template-columns: 1.28fr 0.72fr;
+      gap: 8mm;
+      align-items: end;
+      padding-top: 12mm;
+    }
+
+    .page-two .intro p {
+      padding: 5mm 0 1mm 6mm;
+      border-left: 1mm solid var(--acid);
+      color: #d9d7ce;
+      font-size: 11.5pt;
+      line-height: 1.35;
+    }
+
+    .matrix-wrap {
+      margin-top: 10mm;
+      overflow: hidden;
+      border: 0.5mm solid #50545b;
+      border-radius: var(--radius);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 8.4pt;
+      line-height: 1.22;
+    }
+
+    th, td {
+      padding: 3.2mm 3mm;
+      text-align: left;
+      vertical-align: top;
+      border-right: 0.35mm solid #44484f;
+    }
+
+    th:last-child, td:last-child { border-right: 0; }
+
+    thead th {
+      color: var(--ink);
+      background: var(--acid);
+      font-size: 8.2pt;
+      line-height: 1.05;
+      text-transform: uppercase;
+    }
+
+    thead th:first-child { width: 27%; }
+
+    tbody tr:nth-child(odd) { background: #1a1d22; }
+    tbody tr:nth-child(even) { background: #22262c; }
+    tbody td:first-child { color: #f0eee6; font-weight: 700; }
+    tbody td { color: #bec2c8; }
+    tbody td:last-child { color: var(--soft-acid); font-weight: 700; }
+
+    .layers {
+      display: grid;
+      grid-template-columns: 0.9fr 1.18fr 0.92fr;
+      gap: 5mm;
+      margin-top: 9mm;
+      align-items: stretch;
+    }
+
+    .layer {
+      min-height: 46mm;
+      padding: 5mm;
+      border: 0.5mm solid #474b53;
+      border-radius: var(--radius);
+      background: #1a1d22;
+    }
+
+    .layer.focus {
+      color: var(--ink);
+      background: var(--acid);
+      border-color: var(--acid);
+      transform: translateY(-3mm);
+    }
+
+    .layer p {
+      margin-top: 4mm;
+      color: #bdc1c7;
+      font-size: 9pt;
+      line-height: 1.3;
+    }
+
+    .layer.focus p { color: #30340b; }
+
+    .cta {
+      position: absolute;
+      left: 15mm;
+      right: 15mm;
+      bottom: 13mm;
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 8mm;
+      align-items: center;
+      padding-top: 7mm;
+      border-top: 0.8mm solid var(--acid);
+    }
+
+    .cta h3 { color: var(--acid); font-size: 18pt; }
+
+    .cta p {
+      margin-top: 2mm;
+      color: #c9c7bf;
+      font-size: 9.5pt;
+    }
+
+    .cta-code {
+      padding: 5mm;
+      color: var(--ink);
+      background: var(--paper);
+      border-radius: var(--radius);
+      font: 700 9pt/1.5 Consolas, "Courier New", monospace;
+    }
+
+    .cta-code strong {
+      display: block;
+      color: #586000;
+      font-size: 8pt;
+    }
+
+    @page { size: A4; margin: 0; }
+
+    @media print {
+      html, body { background: transparent; }
+      body { display: block; padding: 0; }
+      .page { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <section class="page page-one" aria-label="Gossip overview">
+    <div class="page-inner">
+      <header class="topline">
+        <div class="brand"><span class="brand-mark" aria-hidden="true"></span> Gossip</div>
+        <div class="license">Open source · Apache 2.0</div>
+      </header>
+
+      <div class="hero">
+        <div class="hero-copy">
+          <h1>Separate sessions.<br><span class="acid">Shared signal.</span></h1>
+          <p>Discover, inspect, search, and coordinate Claude Code and Codex sessions through one local, scriptable fabric.</p>
+        </div>
+        <img class="hero-art" src="logo.png" alt="Gossip robot looking toward a speech bubble">
+      </div>
+
+      <div class="proofline">
+        <div class="claim">
+          <strong>Ask less.<br>Know more.</strong>
+          <span>Peer observation spends zero peer turns.</span>
+        </div>
+        <div class="terminal" aria-label="Gossip command example">
+          <div><span class="prompt">$</span> python -m gossip.bus sessions</div>
+          <div class="result">claude:architect&nbsp;&nbsp; on-activity</div>
+          <div class="result">codex:reviewer&nbsp;&nbsp;&nbsp; idle-wake</div>
+        </div>
+      </div>
+
+      <div class="capabilities">
+        <article class="capability">
+          <h3>See</h3>
+          <p>Read actual tool activity without interrupting the session or adding to its context.</p>
+        </article>
+        <article class="capability">
+          <h3>Find</h3>
+          <p>Search Claude and Codex transcripts before model tokens are spent.</p>
+        </article>
+        <article class="capability">
+          <h3>Reach</h3>
+          <p>Send durable messages from a human, hook, script, Claude, or Codex.</p>
+        </article>
+        <article class="capability">
+          <h3>Prove</h3>
+          <p>Distinguish stored, reachable, claimed, and still unread.</p>
+        </article>
+      </div>
+
+      <div class="footnote">Same-machine by design · no daemon · no open port · no core dependencies</div>
+    </div>
+  </section>
+
+  <section class="page page-two" aria-label="Gossip comparison">
+    <div class="page-inner">
+      <header class="topline">
+        <div class="brand"><span class="brand-mark" aria-hidden="true"></span> Gossip</div>
+        <div>Session fabric, not another scheduler</div>
+      </header>
+
+      <div class="intro">
+        <h2>Claude has a team.<br><span class="acid">Gossip connects the rest.</span></h2>
+        <p>Claude teams coordinate one team. tmux keeps terminals alive. Gossip connects agents. Agency governs terminal commands. Flashback governs context.</p>
+      </div>
+
+      <div class="matrix-wrap">
+        <table aria-label="Gossip comparison with Claude Code and Outsourcerer">
+          <thead>
+            <tr>
+              <th>Need</th>
+              <th>Claude teams</th>
+              <th>Outsourcerer</th>
+              <th>Gossip</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Live Claude team text</td><td>Excellent</td><td>Managed workflows</td><td>Yes</td></tr>
+            <tr><td>Independent Claude + Codex peers</td><td>No</td><td>Controller to delegates</td><td>Yes</td></tr>
+            <tr><td>Observe without a peer turn</td><td>No</td><td>Claude + managed jobs</td><td>Claude + Codex</td></tr>
+            <tr><td>Search transcript history</td><td>No</td><td>Its fleet</td><td>Cross-harness</td></tr>
+            <tr><td>Queue before boot</td><td>No</td><td>Launches its jobs</td><td>Durable address</td></tr>
+            <tr><td>Safe JIT context</td><td>Not messaging</td><td>Not the core job</td><td>Pair with Flashback</td></tr>
+            <tr><td>Self + descendant commands</td><td>Not messaging</td><td>Managed job control</td><td>Pair with Agency</td></tr>
+            <tr><td>Routing, retries, cost</td><td>Shared tasks</td><td>Yes</td><td>Bring your orchestrator</td></tr>
+            <tr><td>Core license</td><td>Product feature</td><td>Noncommercial</td><td>Apache-2.0</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="layers">
+        <article class="layer">
+          <h3>Flashback</h3>
+          <p>Safe JIT context, checked facts, expiration, and lifecycle-aware admission.</p>
+        </article>
+        <article class="layer focus">
+          <h3>Gossip</h3>
+          <p>Address book, observation, transcript search, durable correspondence, and delivery receipts.</p>
+        </article>
+        <article class="layer">
+          <h3>Agency</h3>
+          <p>Self-management and descendant terminal commands. Authority follows custody.</p>
+        </article>
+      </div>
+
+      <div class="cta">
+        <div>
+          <h3>Run your first roster.</h3>
+          <p>Keep tmux. Add correspondence, context, and custody. Bring your orchestrator.</p>
+        </div>
+        <div class="cta-code">
+          <strong>github.com/Yogitmeister/gossip</strong>
+          git clone https://github.com/Yogitmeister/gossip<br>
+          python -m gossip.bus sessions
+        </div>
+      </div>
+    </div>
+  </section>
+</body>
+</html>

@@ -1,19 +1,26 @@
-# Codex support
+# Codex support and the native Claude boundary
 
 Everything on this page was verified empirically against **Codex CLI 0.144.0** on Windows on
 2026-07-30, using an isolated `CODEX_HOME` so no live configuration was touched.
 
+Claude Code's experimental agent teams later added direct messaging between live teammates inside
+one Claude team. That is now the preferred path for simple text on that route. It does not reach
+Codex, independently launched sessions, or external scripts, and it does not provide Gossip's peer
+transcript inspection or historical search. Codex support is therefore not a compatibility
+footnote; it is one of Gossip's primary differentiators.
+
 ## Status
 
-| Capability | Codex | Claude Code |
-|---|---|---|
-| Discover live sessions | ✅ | ✅ |
-| Read a peer's transcript without interrupting it | ✅ | ✅ |
-| Query across all transcripts | ✅ | ✅ |
-| Receive a gossip (next turn) | ✅ **verified** | ✅ |
-| Receive a gossip (mid-turn) | ✅ **verified** | ✅ |
-| Receive a gossip while fully idle | ❌ not yet | ✅ |
-| Send a gossip | ✅ (shell, or the planned MCP server) | ✅ |
+| Capability | Gossip on Codex | Gossip on Claude Code | Claude agent teams |
+|---|---|---|---|
+| Discover live independent sessions | ✅ | ✅ | ❌, explicit team members only |
+| Read a peer transcript without interrupting it | ✅ | ✅ | ❌ |
+| Query transcript history | ✅ | ✅ | ❌ |
+| Receive on the next turn | ✅ verified | ✅ | ✅ |
+| Receive mid-turn between tool calls | ✅ verified | ✅ | ✅ |
+| Receive while fully idle | ❌ open gap | ⚠️ requires Gossip wake setup | ✅ zero extra setup |
+| Send from an external script or another harness | ✅ | ✅ | No general peer CLI |
+| Cross-machine delivery | ❌ | ❌ | Not the team-messaging focus |
 
 ## Why the first attempts failed
 
@@ -131,8 +138,9 @@ machine — which makes filtering before anything enters a context window matter
 - **Idle delivery.** On Claude Code, gossip can wake a session sitting at its prompt. Codex has no
   equivalent surface found so far. `codex exec resume <id>` hands work to a *stopped* session, which
   is useful but is not the same thing.
-- **Mid-turn injection** is expected to work — `PostToolUse` fires with the full payload — but only
-  `UserPromptSubmit` has been confirmed end to end.
+- **Native transport adaptation.** Gossip does not yet delegate supported Claude-to-Claude sends to
+  Claude Code's native `SendMessage`; callers choose the route. A future adapter should prefer the
+  native path without weakening Gossip's external CLI and cross-harness semantics.
 - **Trust re-review on change.** Editing a gossip hook invalidates its trust hash, so an upgrade
   needs one `/hooks` visit. Worth documenting for users rather than surprising them.
 - **`exec`-mode display noise.** Hook lines render as `Completed` *and* `Failed` for the same
