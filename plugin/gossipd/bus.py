@@ -1010,9 +1010,10 @@ def search(pattern: str, roles: str = "user", limit: int = 40,
     if harness in ("claude", "both"):
         # Scope defaults to the CURRENT project, derived from cwd rather than hardcoded. Claude
         # Code names each project directory by replacing every non-alphanumeric character in the
-        # cwd with a dash -- verified against real directories: "C:\\Users\\Yogi" ->
-        # "C--Users-Yogi", "D:\\!! CLAUDE" -> "D-----CLAUDE". A hardcoded project name here
-        # searched nothing at all for anyone whose workspace was not this one.
+        # cwd with a dash -- verified against real directories: "C:\\Users\\ada" ->
+        # "C--Users-ada", and a root with punctuation such as "D:\\!! work" collapses to
+        # "D-----work". A hardcoded project name here would search nothing at all for
+        # anyone whose workspace was not the author's.
         if all_projects:
             globpat = "*/*.jsonl"
         else:
@@ -1130,8 +1131,8 @@ def spawn(prompt: str, name: str | None = None, cwd: str | None = None,
     command line.
 
     Why: a long prompt passed through `start "title" cmd /k claude ... "<prompt>"` is fragile.
-    A prompt containing `!` or spaces (e.g. the `D:/!! CLAUDE/...` workspace root) gets mangled
-    by cmd, and the child boots into an idle session that silently never runs the task --
+    A prompt containing `!` or spaces (a workspace root like `D:/!! work/...` is enough) gets
+    mangled by cmd, and the child boots into an idle session that silently never runs the task --
     observed 2026-07-30: the child was alive with no transcript and no output.
 
     Pre-queueing the task as correspondence and booting with a fixed trivial prompt avoids all
