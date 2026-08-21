@@ -87,19 +87,25 @@ The composition is: **tmux keeps terminals alive; Gossip connects agents; Agency
 commands; Flashback governs context.** Use any one independently or combine them without collapsing
 their trust boundaries.
 
-## Three products. Three powers.
+## Three products. Three powers, kept apart.
 
-| Product | Owns | Never grants by itself |
-|---|---|---|
-| **Gossip** | Correspondence, discovery, observation, history, and receipts | Context admission or terminal authority |
-| **Flashback** | Safe just-in-time context and checked continuity | Permission to act |
-| **Agency** | Terminal custody, command policy, and input receipts | Work scheduling or orchestration |
+| Product | Answers | Owns | Never grants by itself |
+|---|---|---|---|
+| **Gossip** | Who is running, and what was said? | Correspondence, discovery, observation, history, receipts | Context admission or terminal authority |
+| [Flashback](https://github.com/Yogitmeister/flashback) | What belongs in context now, and is it still true? | JIT retrieval, lifecycle timing, freshness, expiry, checked continuity | Permission to act |
+| [Agency](https://github.com/Yogitmeister/agency) | Who may command this terminal? | PTY custody, command policy, descendant scope, input receipts | Work scheduling or orchestration |
 
 > **A message is not a memory. A memory is not permission.**
 
-The products are independent and useful alone. Together they create explicit separations of power:
-Gossip knows the fleet, Flashback brings the right context, and Agency acts. No automatic bridge
-turns correspondence into context or context into a command.
+Each is independent and useful alone. Together they keep three powers separate: Gossip knows the
+fleet, Flashback decides what enters context, Agency acts. No automatic bridge turns correspondence
+into context, or context into a command.
+
+**What that separation is, precisely.** These are product boundaries enforced by capability: Gossip
+ships no execution path, Flashback ships no way to command a terminal, Agency ships no interface to
+write your context. They are *not* OS isolation. All three run as you, as your user, with your
+filesystem. They protect against accidental authority creep and origin confusion between
+cooperating tools — not against a hostile process already running under your account.
 
 ## Pair with Agency when sessions must act
 
@@ -131,6 +137,42 @@ compaction.
 Gossip answers **who is there and what was said**. Flashback answers **what belongs in context now**.
 Keeping those decisions separate prevents a persuasive peer message from silently becoming trusted
 memory.
+
+## Use cases
+
+**You are the message bus, and you are tired of it.**
+Two sessions in the same repo, and the only way one learns what the other found is you, copying a
+paragraph between windows. `send` gives them an address; `--wait` tells you whether the message was
+actually claimed, not just written.
+
+**"Is it still working, or is it stuck?"**
+`observe` reads a peer's real tool calls and recent output from its transcript. It costs that peer
+nothing, adds nothing to its context, and does not interrupt its turn. You can tell progress from
+drift from a confident-but-unsupported status report — without asking a question that forces the
+session to stop and explain itself.
+
+**A Claude session needs something a Codex session already knows.**
+They are different harnesses that will never share a native channel. Gossip gives both the same
+addresses, receipts, and transcript tools, so the Claude session can read or message the Codex one
+directly.
+
+**You want to answer a question you already answered last week.**
+`search` runs a regex across local Claude Code and Codex transcripts *before* anything enters a
+model context. In one working corpus it reduced 937 MB of transcripts to 9.5 MB of relevant user
+text — the filter discarded 99% before a model read a byte.
+
+**The recipient does not exist yet.**
+Queue work to a pre-minted UUID and launch that session later. A live socket dies with its process;
+a gossip address can exist before its owner boots, and survive a restart.
+
+**You want a note waiting for your own post-compaction self.**
+Address a message to your own session id. After the boundary, it is still there — written by the
+version of you that actually knew why.
+
+**Something other than a model needs to talk to your sessions.**
+It is a plain Python CLI over a transparent file protocol. A cron job, CI step, git hook, or shell
+script can send and read on the same bus, with no daemon, no port, and no dependency on a model
+choosing to call an internal tool.
 
 ## Why teams use gossip
 
