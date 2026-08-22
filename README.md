@@ -45,7 +45,9 @@ humans, scripts, hooks, and agents one durable message bus.
 [Claude Code agent teams](https://code.claude.com/docs/en/agent-teams) are the right tool when live
 Claude teammates need to coordinate. [Outsourcerer](https://github.com/alexgreensh/outsourcerer) is
 the right tool when a controller should choose models, launch jobs, supervise them, track cost, and
-show its Claude/managed-job fleet. Use `gossip` when sessions must become independent peers across
+show its Claude/managed-job fleet. 
+
+Use `gossip` when sessions must become independent peers across
 Claude Code and Codex, need durable pre-boot addresses, or need searchable correspondence and
 history outside any one controller or vendor.
 
