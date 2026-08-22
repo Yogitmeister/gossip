@@ -5,8 +5,8 @@
 <h1 align="center">gossip</h1>
 
 <p align="center">
-  <strong>Separate sessions. Shared signal.</strong><br>
-  A local correspondence fabric for independently running Claude Code and Codex sessions.
+  <strong>See every session. Peek at any session. Message any session.</strong><br>
+  One local bus for your Claude Code and Codex sessions — running, idle, or not yet launched.
 </p>
 
 <p align="center">
@@ -18,127 +18,76 @@
 
 ---
 
-## Claude has a team. Gossip connects the sessions outside it.
+```bash
+gossip sessions                                   # SEE every session — who is running, who is reachable
+gossip observe 4f21                               # PEEK at what a session is doing, without interrupting it
+gossip send --to 4f21 --body "take the API half"  # MESSAGE any session — even one that has not booted yet
+gossip search "auth|migration" --harness all      # SEARCH every local transcript before tokens are spent
+```
 
-Claude Code's experimental agent teams give a lead and its live teammates direct messaging and a
-shared task list. That is the right native channel inside a Claude team. It does not provide a
-cross-harness session directory, passive peer inspection, historical search, pre-boot addressing,
-or a model-independent CLI for independently launched sessions.
+No daemon, no port, no third-party dependency. A plain Python CLI over transparent JSON files, so
+humans, scripts, cron jobs, and hooks use the exact same bus the agents do. Seeing, peeking, and
+searching need zero setup; delivering into a live session takes a one-time hook install.
 
-`gossip` does. It discovers independently launched Claude Code and Codex sessions, shows what they
-are doing without interrupting them, searches their transcripts before tokens are spent, and gives
-humans, scripts, hooks, and agents one durable message bus.
+**Why not Claude Code's built-in messaging?** Built-in messaging connects teammates inside one live
+Claude agent team; gossip connects **every** session on your machine — independently launched,
+Claude Code *or* Codex, live or not yet booted — and adds passive observation, transcript search,
+and claimed-or-not delivery receipts on a bus humans and scripts can drive too.[^others]
 
-| Capability | Claude Code agent teams | Outsourcerer | Gossip |
-|---|---|---|---|
-| Primary job | Coordinate a live Claude team | Route and supervise work across engines | Connect existing sessions as addressable peers |
-| Independently launched sessions | No—team membership is explicit | Claude sessions + Outsourcerer jobs; other tools are on its roadmap | **Claude Code + Codex today** |
-| Claude Code ↔ Codex correspondence | No | Delegation through a controller | **Yes, independent peer-to-peer** |
-| Passive tool/output observation | Not the messaging function | Fleet view for Claude sessions and managed jobs | **Yes, across discovered Claude + Codex peers** |
-| Search historical transcripts | Not the messaging function | Session/job transcripts inside its fleet | **Cross-harness local search** |
-| Address before recipient boot | No | Launches its own jobs | **Yes, pre-minted UUID + durable queue** |
-| Model-independent CLI/protocol | Claude Code native | Cross-harness dispatch CLI | **Yes, correspondence fabric** |
-| Self or descendant terminal commands | Not via messaging | Managed job control | No—pair with Agency |
-| Routing, retries, worktrees, budgets | Shared tasks, not a general scheduler | **Yes** | No, deliberately |
-| Core license | Claude product feature | PolyForm Noncommercial; commercial license available | **Apache-2.0** |
+[^others]: Other tools in this space solve different problems and can sit beside gossip:
+[Outsourcerer](https://github.com/alexgreensh/outsourcerer) orchestrates and supervises delegated
+jobs across engines, [Firstmate](https://github.com/kunchenguid/firstmate) fronts a crew of spawned
+workers with one coordinator agent, and [Watchtower](https://github.com/fahd09/watchtower) monitors
+agent API traffic in a live dashboard. None of them is a neutral peer-to-peer correspondence layer
+for sessions you launched independently — that is the niche gossip occupies. Deeper positioning
+notes: [docs/why-gossip.md](docs/why-gossip.md).
 
-[Claude Code agent teams](https://code.claude.com/docs/en/agent-teams) are the right tool when live
-Claude teammates need to coordinate. [Outsourcerer](https://github.com/alexgreensh/outsourcerer) is
-the right tool when a controller should choose models, launch jobs, supervise them, track cost, and
-show its Claude/managed-job fleet. 
+## Quick start
 
-Use `gossip` when sessions must become independent peers across
-Claude Code and Codex, need durable pre-boot addresses, or need searchable correspondence and
-history outside any one controller or vendor.
+```bash
+git clone https://github.com/Yogitmeister/gossip
+cd gossip
+python -m gossip.bus sessions
+```
 
-The native feature validates the category; it does not erase Gossip's boundary. Native messaging is
-a live Claude-team channel. Outsourcerer is a work orchestrator with a fleet view. Gossip is the
-Apache-licensed correspondence fabric both can sit beside.
+Discovery, observation, and search work immediately, with no hooks installed:
 
-## tmux plus the trio: four different layers
+```bash
+python -m gossip.bus sessions
+python -m gossip.bus observe <uuid-or-name>
+python -m gossip.bus search "migration|schema" --harness all
+```
 
-[tmux](https://github.com/tmux/tmux) keeps terminal processes alive, arranges them into sessions,
-windows, and panes, and lets a human detach and reattach. That is valuable infrastructure. It is not
-the whole agent protocol.
+Alias `python -m gossip.bus` to `gossip` for the shorter form used below. The full command tour:
 
-tmux is more capable than "terminal tabs." Its
-[`capture-pane`](https://man.openbsd.org/tmux.1#capture-pane),
-[`send-keys`](https://man.openbsd.org/tmux.1#send-keys),
-[`wait-for`](https://man.openbsd.org/tmux.1#wait-for), and
-[control mode](https://man.openbsd.org/tmux.1#CONTROL_MODE) are strong automation primitives. They
-operate on terminals and tmux events, not agent mailboxes, custody relationships, or model context.
+```bash
+gossip sessions                                      # live roster and reachability
+gossip observe 4f21                                  # inspect without interrupting
+gossip search "auth|permission" --harness all        # filter transcript history locally
+gossip send --to 4f21 --body "take the API half"     # uuid, prefix, pid, or name
+gossip send --to "worker-2" --body "status?" --kind question
+gossip send --to self --body "after compaction: finish the migration" --kind continuation
+gossip send --to 4f21 --body "stop, wrong branch" --priority high
+gossip send --to 4f21 --body "did it land?" --wait 10
+gossip peek                                          # inspect your inbox without claiming it
+gossip spawn "audit the auth module" --name auditor  # convenience launcher, not an orchestrator
+```
 
-| Capability | tmux | Gossip | Agency | Flashback |
-|---|---|---|---|---|
-| Core object | Session / window / pane | Agent address / inbox | Supervised session / custody tree | Context record / lifecycle target |
-| Keep and reattach a terminal | **Yes** | No | No | No |
-| Host arbitrary terminal programs | **Yes** | No—Claude Code and Codex adapters | Harness adapter boundary | No |
-| Inspect activity | Pane screen and retained scrollback | **Harness transcript and tool activity** | Custody and command receipts | Admitted context and freshness |
-| Discover independent Claude + Codex agents | Only if they are already tmux panes | **Yes** | Supervised sessions only | No |
-| Send information session-to-session | Raw keys or a convention you build | **Durable addressed correspondence** | Command requests under custody | No |
-| Queue before the recipient boots | No built-in agent inbox | **Pre-minted UUID + durable queue** | No—target supervisor must be live | No |
-| Prove what happened | tmux accepted a command or input | **Stored / reachable / claimed** | **Queued / refused / injected** | **Verified / unverified / expired** |
-| Inject terminal input | **`send-keys`** | Never | **Yes, under policy and custody** | Never |
-| Decide what enters model context | No | No | No | **Yes, just in time** |
+Message *delivery* into a live session needs a one-time hook registration — see
+[Delivery setup](#delivery-setup).
 
-A transport primitive is not a communication protocol. `tmux send-keys` can carry bytes to a pane;
-it does not identify an agent sender, preserve a durable inbox, prove that the recipient claimed a
-message, restrict a parent to its descendants, or decide what belongs in context.
+## Where it works
 
-The composition is: **tmux keeps terminals alive; Gossip connects agents; Agency governs terminal
-commands; Flashback governs context.** Use any one independently or combine them without collapsing
-their trust boundaries.
-
-## Three products. Three powers, kept apart.
-
-| Product | Answers | Owns | Never grants by itself |
-|---|---|---|---|
-| **Gossip** | Who is running, and what was said? | Correspondence, discovery, observation, history, receipts | Context admission or terminal authority |
-| [Flashback](https://github.com/Yogitmeister/flashback) | What belongs in context now, and is it still true? | JIT retrieval, lifecycle timing, freshness, expiry, checked continuity | Permission to act |
-| [Agency](https://github.com/Yogitmeister/agency) | Who may command this terminal? | PTY custody, command policy, descendant scope, input receipts | Work scheduling or orchestration |
-
-> **A message is not a memory. A memory is not permission.**
-
-Each is independent and useful alone. Together they keep three powers separate: Gossip knows the
-fleet, Flashback decides what enters context, Agency acts. No automatic bridge turns correspondence
-into context, or context into a command.
-
-**What that separation is, precisely.** These are product boundaries enforced by capability: Gossip
-ships no execution path, Flashback ships no way to command a terminal, Agency ships no interface to
-write your context. They are *not* OS isolation. All three run as you, as your user, with your
-filesystem. They protect against accidental authority creep and origin confusion between
-cooperating tools — not against a hostile process already running under your account.
-
-## Pair with Agency when sessions must act
-
-Gossip carries correspondence. [Agency](docs/agency.md) grants terminal authority in its own
-standalone repository. It launches sessions inside an owned PTY so they can:
-
-- compact with Flashback's safe JIT context and checked continuity, switch model or effort, toggle
-  fast or plan mode, reload skills, rename, diagnose, and exit;
-- control the terminal of a child session the current session spawned;
-- keep a visible custody chain from parent to descendant;
-- record queued, refused, failed, and injected outcomes.
-
-That is a stronger capability than messaging, so it stays outside Gossip core. A peer message is
-never executable. Agency authority belongs only to the session itself and its descendants, never to
-an unrelated session that happens to know an address.
-
-This creates a deliberate seam with Outsourcerer. Agency owns terminal mechanics and custody.
-Outsourcerer owns outsourcing policy: which model, which job, which worktree, which retry, and how
-much it costs. An orchestrator can use Agency as a substrate without Gossip becoming another
-orchestrator.
-
-## Pair with Flashback when the right context matters
-
-Flashback is not a transcript archive and not merely a compaction patch. It admits small, relevant
-context just in time, tracks whether retained facts are verified or stale, and can address context
-to a lifecycle point such as the next prompt, planning, implementation, a pre-tool hook, or the next
-compaction.
-
-Gossip answers **who is there and what was said**. Flashback answers **what belongs in context now**.
-Keeping those decisions separate prevents a persuasive peer message from silently becoming trusted
-memory.
+- **Verified today:** interactive **Claude Code CLI** and **Codex CLI** sessions. Discovery unions
+  the Claude Code session registry, live process command lines, and spawn receipts, because any one
+  source can miss sessions.
+- **Same substrate, untested surfaces:** anything that runs the real Claude Code engine with local
+  transcripts and hooks — the VS Code extension, the desktop app — writes the files gossip reads.
+  `observe` and `search` apply to those transcripts as-is; delivery depends on that surface running
+  the registered hooks. Treat these as compatible-by-construction, not yet verified.
+- **Out of scope:** cloud sessions with no local filesystem (claude.ai web), and agents that are not
+  Claude Code or Codex. Gossip is machine-local by design; use Claude Code's Remote Control or
+  another approved network transport when sessions must cross machines.
 
 ## Use cases
 
@@ -149,12 +98,12 @@ actually claimed, not just written.
 
 **"Is it still working, or is it stuck?"**
 `observe` reads a peer's real tool calls and recent output from its transcript. It costs that peer
-nothing, adds nothing to its context, and does not interrupt its turn. You can tell progress from
+no tokens, adds nothing to its context, and does not interrupt its turn. You can tell progress from
 drift from a confident-but-unsupported status report — without asking a question that forces the
 session to stop and explain itself.
 
 **A Claude session needs something a Codex session already knows.**
-They are different harnesses that will never share a native channel. Gossip gives both the same
+They are different harnesses that do not share a native channel. Gossip gives both the same
 addresses, receipts, and transcript tools, so the Claude session can read or message the Codex one
 directly.
 
@@ -172,108 +121,58 @@ Address a message to your own session id. After the boundary, it is still there 
 version of you that actually knew why.
 
 **Something other than a model needs to talk to your sessions.**
-It is a plain Python CLI over a transparent file protocol. A cron job, CI step, git hook, or shell
-script can send and read on the same bus, with no daemon, no port, and no dependency on a model
-choosing to call an internal tool.
-
-## Why teams use gossip
-
-### See without asking
+A cron job, CI step, git hook, or shell script can send and read on the same bus, with no daemon,
+no port, and no dependency on a model choosing to call an internal tool.
 
 <p align="center">
   <img src="docs/gossip-cover.jpg" alt="One agent observes another session without interrupting it" width="1100">
 </p>
 
-<p align="center"><strong>See what another session is doing—without making it stop and explain itself.</strong></p>
+<p align="center"><strong>See what another session is doing — without making it stop and explain itself.</strong></p>
 
-`observe` reads a peer's actual tool calls and recent output from its transcript. It costs the peer
-nothing, adds nothing to its context, and does not interrupt its turn. You can tell the difference
-between progress, waiting, drift, and a confident but unsupported status report before deciding to
-send anything.
+## Gossip vs. Claude Code's built-in messaging
 
-`search` applies a regex across local Claude Code and Codex transcripts before results enter a model
-context. In one working corpus, it reduced 937 MB of transcripts to 9.5 MB of relevant user text.
-The filter discarded 99% before a model read a byte.
+Claude Code's experimental [agent teams](https://code.claude.com/docs/en/agent-teams) give a lead
+and its live teammates direct messaging and a shared task list. Inside one live Claude team, that
+native channel is the right choice — simpler, automatic, no hooks. Gossip exists for everything the
+team boundary excludes:
 
-### Cross the harness boundary
+| | Built-in (agent teams / `SendMessage`) | Gossip |
+|---|---|---|
+| Who can talk | A lead and the teammates it spawned, while the team lives | Any session to any session — plus humans, scripts, CI, hooks |
+| Harnesses | Claude Code only | **Claude Code + Codex** |
+| Independently launched sessions | No — membership is explicit at spawn | **Yes — discovered automatically** |
+| Peek at a peer's work | Shared task list and teammate status, inside the team | **`observe`: passive transcript read — no interrupt, no peer tokens** |
+| Search history | Your own sessions, via `--resume` and history — not from messaging | **One regex across every local Claude + Codex transcript, before tokens are spent** |
+| Message a session that does not exist yet | No | **Yes — pre-minted UUID, durable queue** |
+| Delivery proof | In-process tool result inside a live team | **Stored → reachable → claimed receipts a script can wait on** |
+| Survives a restart | The team dies with its process | **Durable files — a queued message waits, even for your post-compaction self** |
 
-Claude Code's native channel speaks Claude Code. `gossip` gives Claude Code and Codex the same
-addresses, trust framing, delivery receipts, and transcript tools. A Claude session can inspect or
-message a Codex session, and a Codex session can answer through the same filesystem bus.
-
-### Keep coordination durable
-
-A live socket disappears with its process. A gossip address can exist before the recipient boots.
-Queue a task to a pre-minted UUID, leave a continuation for your post-compaction self, or keep a
-message waiting while a session restarts. `--wait` reports whether the recipient claimed the exact
-message instead of treating a successful file write as delivery.
-
-### Automate outside the model
-
-`gossip` is a Python CLI and a transparent file protocol. A human, CI helper, hook, local script,
-Claude Code session, or Codex session can use the same commands. The control surface does not depend
-on one model deciding to call an internal tool.
-
-## Quick start
-
-No package install, daemon, port, or third-party dependency is required.
-
-```bash
-git clone https://github.com/Yogitmeister/gossip
-cd gossip
-python -m gossip.bus sessions
-```
-
-Discovery, observation, and search work without delivery hooks:
-
-```bash
-python -m gossip.bus sessions
-python -m gossip.bus observe <uuid-or-name>
-python -m gossip.bus search "migration|schema" --harness all
-```
-
-Alias `python -m gossip.bus` to `gossip` if you prefer the shorter examples below.
-
-## Use
-
-```bash
-gossip sessions                                      # live roster and reachability
-gossip observe 4f21                                  # inspect without interrupting
-gossip search "auth|permission" --harness all        # filter transcript history locally
-gossip send --to 4f21 --body "take the API half"     # uuid, prefix, pid, or name
-gossip send --to "worker-2" --body "status?" --kind question
-gossip send --to self --body "after compaction: finish the migration" --kind continuation
-gossip send --to 4f21 --body "stop, wrong branch" --priority high
-gossip send --to 4f21 --body "did it land?" --wait 10
-gossip peek                                          # inspect your inbox without claiming it
-gossip spawn "audit the auth module" --name auditor
-```
+The native feature validates the category; it does not cover it. Use both: native `SendMessage`
+inside a live Claude team, gossip when the route crosses a harness, a team boundary, a restart, or
+comes from something that is not a model.
 
 ## Delivery setup
 
-Observation is passive. Delivery requires the receiving session to expose a path that can feed
-gossip into its context.
-
-For teammates inside one live Claude Code agent team, prefer native `SendMessage`; delivery is
-automatic inside that team. Install Gossip delivery hooks when the route crosses into Codex,
-connects independently launched sessions, comes from an external script, or needs Gossip's durable
-queue and receipt semantics.
+Observation and search are passive and need nothing. Delivery requires the receiving session to
+expose a path that can feed gossip into its context.
 
 Register the hooks once in `~/.claude/settings.json` or a project
-`.claude/settings.local.json`. Use absolute paths and no shell operators:
+`.claude/settings.local.json`. Use absolute paths and no shell operators — on Windows, spell out
+the full `python.exe` path (e.g. `"C:/Python311/python.exe"`):
 
 ```json
 {
   "hooks": {
-    "PostToolUse":  [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"C:/Python311/python.exe\" \"C:/path/to/gossip/gossip/hooks/drain.py\"" }] }],
-    "Stop":         [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"C:/Python311/python.exe\" \"C:/path/to/gossip/gossip/hooks/drain.py\"" }] }],
-    "SessionStart": [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"C:/Python311/python.exe\" \"C:/path/to/gossip/gossip/hooks/drain.py\"" }] }],
-    "PreCompact":   [{ "matcher": "", "hooks": [{ "type": "command", "command": "\"C:/Python311/python.exe\" \"C:/path/to/gossip/gossip/hooks/continuity.py\"" }] }]
+    "PostToolUse":  [{ "matcher": "", "hooks": [{ "type": "command", "command": "python3 \"/absolute/path/to/gossip/gossip/hooks/drain.py\"" }] }],
+    "Stop":         [{ "matcher": "", "hooks": [{ "type": "command", "command": "python3 \"/absolute/path/to/gossip/gossip/hooks/drain.py\"" }] }],
+    "SessionStart": [{ "matcher": "", "hooks": [{ "type": "command", "command": "python3 \"/absolute/path/to/gossip/gossip/hooks/drain.py\"" }] }],
+    "PreCompact":   [{ "matcher": "", "hooks": [{ "type": "command", "command": "python3 \"/absolute/path/to/gossip/gossip/hooks/continuity.py\"" }] }]
   }
 }
 ```
 
-Hooks deliver on the next relevant session activity. To receive Gossip while a CLI session is fully
+Hooks deliver on the next relevant session activity. To receive gossip while a CLI session is fully
 idle, arm Claude Code's `Monitor` tool on the watch stream before idling:
 
 ```bash
@@ -281,12 +180,12 @@ gossip watch --for self --mode headline
 ```
 
 The repository also includes an experimental Claude channel plugin under `plugin/gossipd/`. It
-proved that an external Gossip can wake an idle Claude session, but third-party channel admission is
+demonstrated that an external gossip can wake an idle Claude session, but third-party channel admission is
 still gated by Claude Code configuration. Native Claude messaging is simpler for Claude-to-Claude
 traffic; the channel remains useful research for external and cross-harness push.
 
-Every Gossip hook exits successfully on every error path. A broken install cannot wedge the host
-session.
+Every gossip hook is written to exit 0 on every handled error path, so a broken install is designed
+not to wedge the host session.
 
 ## Reachability means something
 
@@ -315,16 +214,43 @@ No sender-side priority can wake a recipient that has no live delivery path. The
 - **Recipient authority:** every body is framed as untrusted peer traffic. A gossip cannot approve a
   permission, execute a slash command, or impersonate the human operator.
 
+## Grows with Agency and Flashback
+
+Gossip carries correspondence between sessions. Two sibling tools extend what a session can do with
+itself — each useful alone, and strongest together:
+
+**[Agency](https://github.com/Yogitmeister/agency) — an extended control surface for sessions.**
+Agency launches a session inside an owned PTY so the session can act on itself and on the children
+it spawns: message itself and its descendants, and run approved commands —
+self-compaction (`/compact <focus>`), effort changes (`/effort`), model changes (`/model`),
+fast and plan mode, skill reloads, rename, diagnose, exit. Every request passes a launch-time
+policy and custody check and produces a receipt: queued, refused, or injected. Gossip moves words
+between peers; Agency gives a session hands on its own terminal. A peer message is never
+executable — terminal authority belongs only to a session and its descendants, never to a stranger
+who happens to know an address.
+
+**[Flashback](https://github.com/Yogitmeister/flashback) — compaction and context, augmented.**
+Flashback lets an agent shape its own context with JIT pins and flashbacks: small context records
+that survive compaction verbatim, are re-verified against live state before each delivery, and can
+be addressed to a lifecycle point — the next prompt, planning, implementation, a pre-tool hook, or
+the next compaction. Checkable facts (branch, hash, path) are re-checked every time they are
+shown; judgment calls surface once across a boundary and then expire. It shines when paired with
+Agency-driven self-compaction — the session picks the moment, Flashback decides what survives — and
+it still improves an ordinary `/compact`.
+
+The seams stay honest without a bridge: a gossip message never becomes trusted context by itself,
+and neither a message nor a memory ever becomes a command.
+
 ## What gossip is not
 
 Gossip does not choose models, manage credentials, supervise retries, merge branches, track cost,
 admit trusted context, or grant permissions. It is intentionally small: discovery, inspection,
-search, durable messaging, and receipts. Pair it with Flashback for safe context admission, Agency
-for self and descendant terminal control, and an orchestrator for work allocation and lifecycle
-policy.
+search, durable messaging, and receipts. Pair it with Flashback for context admission, Agency for
+self and descendant terminal control, and an orchestrator for work allocation and lifecycle policy.
 
-It is also machine-local. Same-machine coordination stays on your filesystem. Use Claude Code's
-Remote Control or another approved network transport when sessions must cross machines.
+It is not tmux, either: tmux keeps terminal processes alive and lets you reattach; it has no agent
+addresses, inboxes, receipts, or transcript search. The two compose — tmux keeps terminals alive,
+gossip connects the sessions inside them. Deeper positioning: [docs/why-gossip.md](docs/why-gossip.md).
 
 ## Security
 
